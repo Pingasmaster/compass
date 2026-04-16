@@ -65,9 +65,11 @@ fun CompassRose(
     // on every recomposition. snapshotFlow reads from that State, so changes to
     // azimuthDegrees actually propagate to the coroutine — without a bare
     // `snapshotFlow { azimuthDegrees }` on a non-state Float, which would capture the
-    // value once and never re-emit.
+    // value once and never re-emit. The effect is keyed on animSpec so a Settings-time
+    // responsiveness change restarts the collector with the new spec instead of the
+    // original closure-captured one (which would silently ignore the setting).
     val latestAzimuth by rememberUpdatedState(azimuthDegrees)
-    LaunchedEffect(Unit) {
+    LaunchedEffect(animSpec) {
         snapshotFlow { latestAzimuth }
             .collectLatest { target ->
                 cumulativeAngle.animateTo(

@@ -10,7 +10,6 @@ import android.hardware.display.DisplayManager
 import android.location.Location
 import android.view.Display
 import android.view.Surface
-import androidx.core.content.ContextCompat
 import com.compass.app.domain.model.CompassAccuracy
 import com.compass.app.domain.model.CompassReading
 import kotlinx.coroutines.channels.awaitClose
@@ -31,9 +30,9 @@ class CompassSensor(context: Context) {
 
     private val appContext = context.applicationContext
     private val sensorManager: SensorManager? =
-        ContextCompat.getSystemService(appContext, SensorManager::class.java)
+        appContext.getSystemService(SensorManager::class.java)
     private val displayManager: DisplayManager? =
-        ContextCompat.getSystemService(appContext, DisplayManager::class.java)
+        appContext.getSystemService(DisplayManager::class.java)
 
     private val rotationSensor: Sensor? =
         sensorManager?.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
@@ -93,6 +92,21 @@ class CompassSensor(context: Context) {
         val orientation = FloatArray(3)
         var latest = initial
 
+        // Cache the display rotation instead of re-querying DisplayManager on every
+        // sensor tick (~50 Hz). A DisplayListener keeps the cache in sync for the
+        // rare runtime rotation.
+        var displayRotation = currentDisplayRotation()
+        val displayListener = object : DisplayManager.DisplayListener {
+            override fun onDisplayChanged(displayId: Int) {
+                if (displayId == Display.DEFAULT_DISPLAY) {
+                    displayRotation = currentDisplayRotation()
+                }
+            }
+            override fun onDisplayAdded(displayId: Int) {}
+            override fun onDisplayRemoved(displayId: Int) {}
+        }
+        displayManager?.registerDisplayListener(displayListener, null)
+
         val listener = object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent) {
                 if (event.sensor.type != Sensor.TYPE_ROTATION_VECTOR &&
@@ -101,7 +115,7 @@ class CompassSensor(context: Context) {
 
                 SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
 
-                val (axisX, axisY) = when (currentDisplayRotation()) {
+                val (axisX, axisY) = when (displayRotation) {
                     Surface.ROTATION_90 -> SensorManager.AXIS_Y to SensorManager.AXIS_MINUS_X
                     Surface.ROTATION_180 -> SensorManager.AXIS_MINUS_X to SensorManager.AXIS_MINUS_Y
                     Surface.ROTATION_270 -> SensorManager.AXIS_MINUS_Y to SensorManager.AXIS_X
@@ -128,12 +142,17 @@ class CompassSensor(context: Context) {
         }
 
         manager.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_GAME)
-        awaitClose { manager.unregisterListener(listener) }
+        awaitClose {
+            manager.unregisterListener(listener)
+            displayManager?.unregisterDisplayListener(displayListener)
+        }
     }
 
     private fun currentDisplayRotation(): Int {
         // DisplayManager is safe to query from the application context, unlike
         // Context.getDisplay() which throws UnsupportedOperationException there.
+        // Known limitation: this returns DEFAULT_DISPLAY's rotation, which is
+        // wrong on foldables / external-display activities. Fine for phones.
         val display = displayManager?.getDisplay(Display.DEFAULT_DISPLAY)
         return display?.rotation ?: Surface.ROTATION_0
     }

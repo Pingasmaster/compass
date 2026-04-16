@@ -12,6 +12,10 @@ import kotlin.math.sin
  * @param alpha 0..1 — higher tracks faster, lower is smoother.
  */
 class AzimuthSmoother(private val alpha: Float = 0.15f) {
+    init {
+        require(alpha in 0f..1f) { "alpha must be in [0, 1], got $alpha" }
+    }
+
     private var sinAcc: Float = 0f
     private var cosAcc: Float = 0f
     private var initialised = false
