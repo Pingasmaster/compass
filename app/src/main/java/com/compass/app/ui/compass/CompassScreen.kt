@@ -45,16 +45,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.compass.app.data.preferences.Responsiveness
@@ -71,24 +67,20 @@ import kotlinx.coroutines.launch
 @Composable
 fun CompassScreen(viewModel: CompassViewModel = viewModel()) {
     val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
 
-    DisposableLifecycle(
-        onResume = viewModel::onResume,
-        onPause = viewModel::onPause,
-        lifecycleOwner = lifecycleOwner,
-    )
-
+    // Sensor registration is driven by StateFlow subscription (callbackFlow inside
+    // CompassSensor), so `collectAsStateWithLifecycle` is what starts and stops it —
+    // no separate DisposableLifecycle needed.
     val reading by viewModel.readings.collectAsStateWithLifecycle()
     val themeMode by viewModel.prefs.themeMode.collectAsStateWithLifecycle(initialValue = ThemeMode.SYSTEM)
     val dynamicColor by viewModel.prefs.dynamicColorEnabled.collectAsStateWithLifecycle(initialValue = true)
     val oledBlack by viewModel.prefs.oledBlackEnabled.collectAsStateWithLifecycle(initialValue = false)
     val trueNorth by viewModel.prefs.trueNorthEnabled.collectAsStateWithLifecycle(initialValue = false)
     val responsiveness by viewModel.prefs.responsiveness.collectAsStateWithLifecycle(initialValue = Responsiveness.NORMAL)
+    val targetAngle by viewModel.targetAngle.collectAsStateWithLifecycle()
 
     var showSettings by remember { mutableStateOf(false) }
-    var targetAngle by rememberSaveable { mutableStateOf<Float?>(null) }
     var showTargetDialog by remember { mutableStateOf(false) }
 
     val locationPermissionLauncher = rememberLauncherForActivityResult(
@@ -157,7 +149,7 @@ fun CompassScreen(viewModel: CompassViewModel = viewModel()) {
         TargetAngleSheet(
             currentTarget = targetAngle,
             onConfirm = { value ->
-                targetAngle = value
+                viewModel.setTargetAngle(value)
                 showTargetDialog = false
             },
             onDismiss = { showTargetDialog = false },
@@ -410,25 +402,6 @@ private fun TargetAngleSheet(
 
             Spacer(Modifier.height(16.dp))
         }
-    }
-}
-
-@Composable
-private fun DisposableLifecycle(
-    onResume: () -> Unit,
-    onPause: () -> Unit,
-    lifecycleOwner: androidx.lifecycle.LifecycleOwner,
-) {
-    androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_RESUME -> onResume()
-                Lifecycle.Event.ON_PAUSE -> onPause()
-                else -> Unit
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 }
 

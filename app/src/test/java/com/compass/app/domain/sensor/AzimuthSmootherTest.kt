@@ -95,9 +95,10 @@ class UnwrapAngleTest {
     }
 
     @Test
-    fun `antipode distance resolves deterministically`() {
-        // Exactly 180° apart — the formula rounds toward -180 by convention.
-        val out = unwrapAngle(0f, 180f)
-        assertEquals(-180f, out, 0.001f)
+    fun `antipode distance resolves toward plus 180`() {
+        // Exactly 180° apart — convention: always bias toward +180 so opposite
+        // headings actually animate instead of reporting a zero delta.
+        assertEquals(180f, unwrapAngle(0f, 180f), 0.001f)
+        assertEquals(190f, unwrapAngle(10f, 190f), 0.001f)
     }
 }

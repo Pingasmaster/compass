@@ -45,8 +45,13 @@ class AzimuthSmoother(private val alpha: Float = 0.15f) {
  * [androidx.compose.animation.core.Animatable] takes the short route across
  * the 0/360 seam. Returns the cumulative angle that differs from [previous]
  * by the shortest signed delta to [newAngle].
+ *
+ * At an exact ±180° antipode the naïve `(x % 360 + 540) % 360 - 180` formula
+ * rounds delta to 0, making the rose freeze. We bias toward +180 whenever the
+ * signed delta lands on −180 so opposite headings always animate.
  */
 fun unwrapAngle(previous: Float, newAngle: Float): Float {
-    val diff = ((newAngle - previous) % 360f + 540f) % 360f - 180f
+    var diff = ((newAngle - previous) % 360f + 540f) % 360f - 180f
+    if (diff == -180f) diff = 180f
     return previous + diff
 }

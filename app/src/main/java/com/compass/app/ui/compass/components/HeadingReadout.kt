@@ -17,7 +17,9 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,9 +44,14 @@ fun HeadingReadout(
     targetHitColor: Color = MaterialTheme.colorScheme.tertiary,
 ) {
     // Unwrap to a cumulative angle so animateFloatAsState takes the shortest path
-    // across the 0°/360° seam; then normalise back to [0,360) for display.
-    val cumulative = remember { androidx.compose.runtime.mutableFloatStateOf(azimuthDegrees) }
-    cumulative.floatValue = unwrapAngle(cumulative.floatValue, azimuthDegrees)
+    // across the 0°/360° seam; then normalise back to [0,360) for display. The
+    // unwrap is written in a LaunchedEffect instead of during composition so we
+    // don't invalidate the scope that just read the state (which previously
+    // forced an extra recomposition every sensor tick).
+    val cumulative = remember { mutableFloatStateOf(azimuthDegrees) }
+    LaunchedEffect(azimuthDegrees) {
+        cumulative.floatValue = unwrapAngle(cumulative.floatValue, azimuthDegrees)
+    }
 
     val motionScheme = MaterialTheme.motionScheme
     val animated by animateFloatAsState(

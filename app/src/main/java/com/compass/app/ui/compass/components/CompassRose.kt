@@ -19,6 +19,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -57,13 +59,18 @@ fun CompassRose(
     responsiveness: Responsiveness = Responsiveness.NORMAL,
 ) {
     val cumulativeAngle = remember { Animatable(0f) }
-    val animSpec: AnimationSpec<Float> = responsiveness.toSpringSpec()
-    LaunchedEffect(azimuthDegrees) {
-        val target = unwrapAngle(cumulativeAngle.value, -azimuthDegrees)
-        cumulativeAngle.animateTo(
-            targetValue = target,
-            animationSpec = animSpec,
-        )
+    val animSpec: AnimationSpec<Float> = remember(responsiveness) { responsiveness.toSpringSpec() }
+    // Drive the animation from a snapshotFlow instead of keying LaunchedEffect on the
+    // rapidly-changing Float — avoids re-launching the coroutine on every sensor tick
+    // and lets Animatable retarget smoothly without allocating new Jobs.
+    LaunchedEffect(Unit) {
+        snapshotFlow { azimuthDegrees }
+            .collectLatest { target ->
+                cumulativeAngle.animateTo(
+                    targetValue = unwrapAngle(cumulativeAngle.value, -target),
+                    animationSpec = animSpec,
+                )
+            }
     }
 
     val onSurface = MaterialTheme.colorScheme.onSurface
