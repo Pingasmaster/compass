@@ -41,7 +41,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.IconButtonShapes
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MediumFlexibleTopAppBar
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Scaffold
@@ -117,7 +117,11 @@ fun CompassScreen(
 
     Scaffold(
         topBar = {
-            MediumFlexibleTopAppBar(
+            // Regular (small) TopAppBar keeps title + actions on the same baseline.
+            // The subtitle slot (second overload) places the AccuracyChip under the
+            // title on the left, still within the single-row layout — visually the
+            // actions on the right stay level with the title text.
+            TopAppBar(
                 title = { Text(stringResource(R.string.title_compass)) },
                 subtitle = {
                     AccuracyChip(
