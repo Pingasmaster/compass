@@ -69,6 +69,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -169,8 +170,9 @@ fun CompassScreen(
                     cardinal to bucketed
                 }
             }
-            val roseDescription = stringResource(
-                R.string.rose_content_description,
+            val roseDescription = pluralStringResource(
+                R.plurals.rose_content_description,
+                roseBucket.second,
                 roseBucket.second,
                 roseBucket.first,
             )
