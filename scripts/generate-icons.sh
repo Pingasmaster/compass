@@ -10,7 +10,7 @@ cd "$SCRIPT_DIR/.."
 SRC="logo.png"
 BG_COLOR="#F6F4F0"   # cream background sampled from logo.png
 FUZZ="8%"            # tolerance when stripping background
-CONTENT_RATIO="0.55" # content fraction of canvas (safe zone is 0.61)
+CONTENT_RATIO="0.44" # content fraction of canvas (safe zone is 0.61) — extra padding so the logo sits comfortably inside every mask
 
 # Density → foreground canvas size (px). Foreground is 108dp; 1dp = 1px at mdpi.
 declare -A DENSITIES=(
