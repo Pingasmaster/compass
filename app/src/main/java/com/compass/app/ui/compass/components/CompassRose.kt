@@ -83,21 +83,37 @@ fun CompassRose(
     val needleNorth = if (isDark) NorthRedDark else NorthRed
     val needleSouth = MaterialTheme.colorScheme.surfaceContainerHighest
 
-    // Calibration cue: a subtle pulse on the rose disc itself — no extra backdrop shape.
-    val calibrationPulse = rememberInfiniteTransition(label = "calibrationPulse")
-    val calibrationAlpha by calibrationPulse.animateFloat(
-        initialValue = if (calibrating) 0.5f else 0f,
-        targetValue = if (calibrating) 1f else 0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1200, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "calibrationPulseAlpha",
-    )
+    // rememberInfiniteTransition ticks even when its animated value is constant, so
+    // keep it off the composition entirely while idle.
+    val ringColor = if (calibrating) {
+        pulsingRingColor(base = outlineVariant, pulse = errorColor)
+    } else {
+        outlineVariant
+    }
 
     val cardinalStyle = MaterialTheme.typography.headlineSmall
     val intercardinalStyle = MaterialTheme.typography.labelLarge
     val textMeasurer = rememberTextMeasurer()
+    // Pre-measure the eight cardinal/intercardinal labels once per colour+style pair —
+    // the rose redraws at sensor rate (~50 Hz), so doing it inside draw was cheap but
+    // not free.
+    val cardinalLayouts = remember(
+        cardinalStyle, intercardinalStyle, textMeasurer,
+        needleNorth, onSurface, onSurfaceVariant,
+    ) {
+        CardinalMarkers.map { marker ->
+            val style = if (marker.main) cardinalStyle else intercardinalStyle
+            val color = when {
+                marker.label == "N" -> needleNorth
+                marker.main -> onSurface
+                else -> onSurfaceVariant
+            }
+            marker to textMeasurer.measure(
+                text = marker.label,
+                style = style.copy(color = color, textAlign = TextAlign.Center),
+            )
+        }
+    }
 
 
     Box(modifier = modifier) {
@@ -116,11 +132,6 @@ fun CompassRose(
                 radius = roseRadius,
                 center = Offset(cx, cy),
             )
-            val ringColor = if (calibrating) {
-                androidx.compose.ui.graphics.lerp(outlineVariant, errorColor, calibrationAlpha)
-            } else {
-                outlineVariant
-            }
             drawCircle(
                 color = ringColor,
                 radius = roseRadius,
@@ -138,15 +149,10 @@ fun CompassRose(
                     minorColor = onSurfaceVariant,
                 )
                 drawCardinals(
-                    textMeasurer = textMeasurer,
+                    layouts = cardinalLayouts,
                     centerX = cx,
                     centerY = cy,
                     radius = roseRadius * 0.82f,
-                    cardinalStyle = cardinalStyle,
-                    intercardinalStyle = intercardinalStyle,
-                    northColor = needleNorth,
-                    otherColor = onSurface,
-                    subColor = onSurfaceVariant,
                 )
 
                 // Target line — rotates with the rose so it stays locked to the cardinal
@@ -270,44 +276,46 @@ private fun DrawScope.drawTicks(
     }
 }
 
+internal data class CardinalMarker(val label: String, val angle: Float, val main: Boolean)
+
+internal val CardinalMarkers: List<CardinalMarker> = listOf(
+    CardinalMarker("N", 0f, true),
+    CardinalMarker("NE", 45f, false),
+    CardinalMarker("E", 90f, true),
+    CardinalMarker("SE", 135f, false),
+    CardinalMarker("S", 180f, true),
+    CardinalMarker("SW", 225f, false),
+    CardinalMarker("W", 270f, true),
+    CardinalMarker("NW", 315f, false),
+)
+
 private fun DrawScope.drawCardinals(
-    textMeasurer: TextMeasurer,
+    layouts: List<Pair<CardinalMarker, androidx.compose.ui.text.TextLayoutResult>>,
     centerX: Float,
     centerY: Float,
     radius: Float,
-    cardinalStyle: TextStyle,
-    intercardinalStyle: TextStyle,
-    northColor: Color,
-    otherColor: Color,
-    subColor: Color,
 ) {
-    data class Marker(val label: String, val angle: Float, val main: Boolean)
-    val markers = listOf(
-        Marker("N", 0f, true),
-        Marker("NE", 45f, false),
-        Marker("E", 90f, true),
-        Marker("SE", 135f, false),
-        Marker("S", 180f, true),
-        Marker("SW", 225f, false),
-        Marker("W", 270f, true),
-        Marker("NW", 315f, false),
-    )
-    for (marker in markers) {
-        val style = if (marker.main) cardinalStyle else intercardinalStyle
-        val color = when {
-            marker.label == "N" -> northColor
-            marker.main -> otherColor
-            else -> subColor
-        }
-        val layout = textMeasurer.measure(
-            text = marker.label,
-            style = style.copy(color = color, textAlign = TextAlign.Center),
-        )
+    for ((marker, layout) in layouts) {
         val rad = Math.toRadians((marker.angle - 90.0))
         val x = centerX + (radius * cos(rad)).toFloat() - layout.size.width / 2f
         val y = centerY + (radius * sin(rad)).toFloat() - layout.size.height / 2f
         drawText(textLayoutResult = layout, topLeft = Offset(x, y))
     }
+}
+
+@Composable
+private fun pulsingRingColor(base: Color, pulse: Color): Color {
+    val transition = rememberInfiniteTransition(label = "calibrationPulse")
+    val alpha by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "calibrationPulseAlpha",
+    )
+    return androidx.compose.ui.graphics.lerp(base, pulse, alpha)
 }
 
 private fun DrawScope.drawNeedle(
