@@ -50,4 +50,5 @@
     <string name="target_sheet_cancel">Cancel</string>
     <string name="target_sheet_set">Set</string>
     <string name="target_sheet_value_label">%1$d°</string>
+    <string name="target_sheet_field_label">Degrees</string>
 </resources>
