@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Compass" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- Holding theme used only before Compose takes over. The values-night/
+         variant uses DeviceDefault (dark) so the pre-Compose splash tracks the
+         user's theme instead of always flashing light. -->
+    <style name="Theme.Compass" parent="android:Theme.DeviceDefault.Light.NoActionBar">
+        <item name="android:windowBackground">@android:color/transparent</item>
+    </style>
 </resources>
