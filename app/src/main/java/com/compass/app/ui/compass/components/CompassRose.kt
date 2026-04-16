@@ -1,0 +1,317 @@
+package com.compass.app.ui.compass.components
+
+import android.graphics.Matrix as AndroidMatrix
+import android.graphics.Path as AndroidPath
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MaterialShapes
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.toPath
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.asAndroidPath
+import androidx.compose.ui.graphics.asComposePath
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.text.TextMeasurer
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.graphics.shapes.Morph
+import androidx.graphics.shapes.RoundedPolygon
+import androidx.graphics.shapes.toPath
+import com.compass.app.domain.sensor.unwrapAngle
+import com.compass.app.ui.theme.NorthRed
+import com.compass.app.ui.theme.NorthRedDark
+import kotlin.math.cos
+import kotlin.math.sin
+import androidx.compose.ui.graphics.Path as ComposePath
+
+/**
+ * Rotating compass rose. The outer ring is [MaterialShapes.Cookie12Sided] — the M3
+ * Expressive preset polygon. Tick marks and cardinal letters ride on an inner rotating
+ * disc; a fixed red needle and top triangle indicate the current heading.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun CompassRose(
+    azimuthDegrees: Float,
+    modifier: Modifier = Modifier,
+    isDark: Boolean,
+    calibrating: Boolean = false,
+) {
+    val cumulativeAngle = remember { Animatable(0f) }
+    LaunchedEffect(azimuthDegrees) {
+        val target = unwrapAngle(cumulativeAngle.value, -azimuthDegrees)
+        cumulativeAngle.animateTo(
+            targetValue = target,
+            animationSpec = spring(
+                dampingRatio = Spring.DampingRatioLowBouncy,
+                stiffness = Spring.StiffnessLow,
+            ),
+        )
+    }
+
+    // Morph the outer cookie toward a "flower" shape during calibration for an
+    // unmistakably-expressive visual cue.
+    val morph = remember {
+        Morph(start = MaterialShapes.Cookie12Sided, end = MaterialShapes.Flower)
+    }
+    val morphTransition = rememberInfiniteTransition(label = "calibrationMorph")
+    val morphProgress by morphTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = if (calibrating) 1f else 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1400, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "calibrationMorphProgress",
+    )
+
+    val onSurface = MaterialTheme.colorScheme.onSurface
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val primary = MaterialTheme.colorScheme.primary
+    val onPrimary = MaterialTheme.colorScheme.onPrimary
+    val surfaceContainer = MaterialTheme.colorScheme.surfaceContainer
+    val surfaceContainerHigh = MaterialTheme.colorScheme.surfaceContainerHigh
+    val outline = MaterialTheme.colorScheme.outlineVariant
+    val needleNorth = if (isDark) NorthRedDark else NorthRed
+    val needleSouth = MaterialTheme.colorScheme.surfaceContainerHighest
+
+    val cardinalStyle = MaterialTheme.typography.headlineSmall
+    val intercardinalStyle = MaterialTheme.typography.labelLarge
+    val textMeasurer = rememberTextMeasurer()
+
+    // M3 Expressive preset: 12-sided rounded cookie.
+    val cookie = MaterialShapes.Cookie12Sided
+
+    Box(modifier = modifier) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val w = size.width
+            val h = size.height
+            val cx = w / 2f
+            val cy = h / 2f
+            val radius = minOf(w, h) / 2f * 0.92f
+
+            // Expressive background disc: interpolate Cookie ↔ Flower when calibrating.
+            val discPath = if (calibrating) {
+                morphPath(morph, morphProgress, cx, cy, radius, cumulativeAngle.value)
+            } else {
+                roundedPolygonPath(cookie, cx, cy, radius, cumulativeAngle.value)
+            }
+            drawPath(path = discPath, color = surfaceContainerHigh)
+            drawPath(
+                path = discPath,
+                color = outline,
+                style = Stroke(width = 2.dp.toPx()),
+            )
+
+            // Inner plain disc for the rose itself.
+            val innerRadius = radius * 0.78f
+            drawCircle(
+                color = surfaceContainer,
+                radius = innerRadius,
+                center = Offset(cx, cy),
+            )
+
+            // Rotating rose: ticks + letters.
+            rotate(degrees = cumulativeAngle.value, pivot = Offset(cx, cy)) {
+                drawTicks(
+                    centerX = cx,
+                    centerY = cy,
+                    outerRadius = innerRadius * 0.98f,
+                    majorColor = onSurface,
+                    minorColor = onSurfaceVariant,
+                )
+                drawCardinals(
+                    textMeasurer = textMeasurer,
+                    centerX = cx,
+                    centerY = cy,
+                    radius = innerRadius * 0.70f,
+                    cardinalStyle = cardinalStyle,
+                    intercardinalStyle = intercardinalStyle,
+                    northColor = needleNorth,
+                    otherColor = onSurface,
+                    subColor = onSurfaceVariant,
+                )
+            }
+
+            // Fixed needle.
+            val needleLen = innerRadius * 0.90f
+            val needleHalfWidth = radius * 0.055f
+            drawNeedle(
+                centerX = cx,
+                centerY = cy,
+                length = needleLen,
+                halfWidth = needleHalfWidth,
+                northColor = needleNorth,
+                southColor = needleSouth,
+            )
+
+            // Hub.
+            drawCircle(color = primary, radius = radius * 0.055f, center = Offset(cx, cy))
+            drawCircle(color = onPrimary, radius = radius * 0.022f, center = Offset(cx, cy))
+
+            // Fixed top indicator triangle.
+            val tipY = cy - radius
+            val trianglePath = ComposePath().apply {
+                moveTo(cx, tipY - 10.dp.toPx())
+                lineTo(cx - 10.dp.toPx(), tipY + 8.dp.toPx())
+                lineTo(cx + 10.dp.toPx(), tipY + 8.dp.toPx())
+                close()
+            }
+            drawPath(trianglePath, color = primary)
+        }
+    }
+}
+
+private fun roundedPolygonPath(
+    polygon: RoundedPolygon,
+    cx: Float,
+    cy: Float,
+    radius: Float,
+    rotationDeg: Float,
+): ComposePath {
+    val androidPath = polygon.toPath(AndroidPath())
+    val matrix = AndroidMatrix().apply {
+        postScale(radius, radius)
+        postRotate(rotationDeg)
+        postTranslate(cx, cy)
+    }
+    androidPath.transform(matrix)
+    return androidPath.asComposePath()
+}
+
+private fun morphPath(
+    morph: Morph,
+    progress: Float,
+    cx: Float,
+    cy: Float,
+    radius: Float,
+    rotationDeg: Float,
+): ComposePath {
+    // material3.toPath extension accepts a Morph + progress and emits a Compose Path.
+    val composePath = morph.toPath(progress = progress, path = ComposePath())
+    val matrix = AndroidMatrix().apply {
+        postScale(radius, radius)
+        postRotate(rotationDeg)
+        postTranslate(cx, cy)
+    }
+    val android = AndroidPath().apply {
+        set(composePath.asAndroidPath())
+        transform(matrix)
+    }
+    return android.asComposePath()
+}
+
+private fun DrawScope.drawTicks(
+    centerX: Float,
+    centerY: Float,
+    outerRadius: Float,
+    majorColor: Color,
+    minorColor: Color,
+) {
+    val majorLen = outerRadius * 0.12f
+    val minorLen = outerRadius * 0.055f
+    for (i in 0 until 72) {
+        val angleDeg = i * 5f
+        val isMajor = angleDeg % 15f == 0f
+        val len = if (isMajor) majorLen else minorLen
+        val color = if (isMajor) majorColor else minorColor
+        val strokeWidth = if (isMajor) 3.dp.toPx() else 1.5.dp.toPx()
+        rotate(degrees = angleDeg, pivot = Offset(centerX, centerY)) {
+            drawLine(
+                color = color,
+                start = Offset(centerX, centerY - outerRadius),
+                end = Offset(centerX, centerY - outerRadius + len),
+                strokeWidth = strokeWidth,
+                cap = StrokeCap.Round,
+            )
+        }
+    }
+}
+
+private fun DrawScope.drawCardinals(
+    textMeasurer: TextMeasurer,
+    centerX: Float,
+    centerY: Float,
+    radius: Float,
+    cardinalStyle: TextStyle,
+    intercardinalStyle: TextStyle,
+    northColor: Color,
+    otherColor: Color,
+    subColor: Color,
+) {
+    data class Marker(val label: String, val angle: Float, val main: Boolean)
+    val markers = listOf(
+        Marker("N", 0f, true),
+        Marker("NE", 45f, false),
+        Marker("E", 90f, true),
+        Marker("SE", 135f, false),
+        Marker("S", 180f, true),
+        Marker("SW", 225f, false),
+        Marker("W", 270f, true),
+        Marker("NW", 315f, false),
+    )
+    for (marker in markers) {
+        val style = if (marker.main) cardinalStyle else intercardinalStyle
+        val color = when {
+            marker.label == "N" -> northColor
+            marker.main -> otherColor
+            else -> subColor
+        }
+        val layout = textMeasurer.measure(
+            text = marker.label,
+            style = style.copy(color = color, textAlign = TextAlign.Center),
+        )
+        val rad = Math.toRadians((marker.angle - 90.0))
+        val x = centerX + (radius * cos(rad)).toFloat() - layout.size.width / 2f
+        val y = centerY + (radius * sin(rad)).toFloat() - layout.size.height / 2f
+        drawText(textLayoutResult = layout, topLeft = Offset(x, y))
+    }
+}
+
+private fun DrawScope.drawNeedle(
+    centerX: Float,
+    centerY: Float,
+    length: Float,
+    halfWidth: Float,
+    northColor: Color,
+    southColor: Color,
+) {
+    val northPath = ComposePath().apply {
+        moveTo(centerX, centerY - length)
+        lineTo(centerX - halfWidth, centerY)
+        lineTo(centerX + halfWidth, centerY)
+        close()
+    }
+    drawPath(northPath, color = northColor)
+
+    val southPath = ComposePath().apply {
+        moveTo(centerX, centerY + length)
+        lineTo(centerX - halfWidth, centerY)
+        lineTo(centerX + halfWidth, centerY)
+        close()
+    }
+    drawPath(southPath, color = southColor)
+}

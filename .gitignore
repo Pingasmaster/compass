@@ -1,0 +1,52 @@
+# Claude Code
+.claude/
+CLAUDE.md
+.claude_skip/
+*.plan.md
+
+# Gradle / Kotlin build
+.gradle/
+.kotlin/
+/build/
+/app/build/
+/captures/
+.build.lock
+/out/
+/app/out/
+
+# Generated / intermediate
+.externalNativeBuild/
+.cxx/
+
+# Android Studio / IntelliJ
+*.iml
+/.idea/
+/local.properties
+
+# VS Code / Fleet
+/.vscode/
+/.fleet/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# APKs / bundles / mapping
+*.apk
+*.ap_
+*.aab
+/app/release/
+/mapping/
+
+# Signing keys — never commit
+*.jks
+*.keystore
+.password-signing-keys
+release-keystore.jks
+
+# JVM / debugging
+hs_err_pid*.log
+*.hprof
+
+# Generated icon/script temp files
+/scripts/*.tmp
