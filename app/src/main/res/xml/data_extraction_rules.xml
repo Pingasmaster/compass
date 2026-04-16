@@ -1,5 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    Only the DataStore preferences file needs to travel across devices. The empty
+    elements we had before meant "back up everything by default", which happened
+    to be equivalent here but hid intent.
+-->
 <data-extraction-rules>
-    <cloud-backup />
-    <device-transfer />
+    <cloud-backup>
+        <include domain="file" path="datastore/" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="file" path="datastore/" />
+    </device-transfer>
 </data-extraction-rules>

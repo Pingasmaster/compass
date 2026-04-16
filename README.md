@@ -33,7 +33,7 @@ The app follows Material 3 Expressive guidelines throughout: expressive cookie-s
 - **Dynamic color** (Material You) follows your wallpaper theme
 - **Dark mode** with system, light, and dark options
 - **OLED dark theme** with pure black surfaces
-- **Edge-to-edge** with proper system bar handling, portrait-locked for reliable orientation
+- **Edge-to-edge** with proper system bar handling and rotation-aware axis remap so the rose stays correct in any display orientation
 
 ## Building from source
 

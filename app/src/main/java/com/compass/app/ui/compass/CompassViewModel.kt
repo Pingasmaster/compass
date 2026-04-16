@@ -8,8 +8,6 @@ import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
-import android.os.Bundle
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
@@ -35,7 +33,7 @@ class CompassViewModel(
 
     private val sensor = CompassSensor(application)
     private val locationManager =
-        ContextCompat.getSystemService(application, LocationManager::class.java)
+        application.getSystemService(LocationManager::class.java)
 
     private var locationListener: LocationListener? = null
 
@@ -75,12 +73,13 @@ class CompassViewModel(
         requestLocationIfPermitted(getApplication())
     }
 
+    // Permission is re-checked on the first three lines below; the suppression
+    // covers the lint pass that can't follow the guard back to the callsite.
     @SuppressLint("MissingPermission")
     private fun requestLocationIfPermitted(context: Context) {
         val manager = locationManager ?: return
-        val granted = ContextCompat.checkSelfPermission(
-            context, Manifest.permission.ACCESS_COARSE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
+        val granted = context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
         if (!granted) return
         stopLocationUpdates()
         val provider = when {
@@ -88,15 +87,10 @@ class CompassViewModel(
             manager.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
             else -> return
         }
-        val listener = object : LocationListener {
-            override fun onLocationChanged(location: Location) {
-                sensor.updateLocation(location)
-            }
-            @Deprecated("legacy")
-            override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
-            override fun onProviderDisabled(provider: String) {}
-            override fun onProviderEnabled(provider: String) {}
-        }
+        // LocationListener gained default implementations for onStatusChanged,
+        // onProviderEnabled and onProviderDisabled in API 29, so on minSdk 31 we
+        // only need to override onLocationChanged.
+        val listener = LocationListener { location -> sensor.updateLocation(location) }
         locationListener = listener
         manager.getLastKnownLocation(provider)?.let(sensor::updateLocation)
         manager.requestLocationUpdates(provider, 60_000L, 100f, listener)
@@ -108,6 +102,7 @@ class CompassViewModel(
     }
 
     override fun onCleared() {
+        // No super call — ViewModel.onCleared is @EmptySuper and lint flags it.
         stopLocationUpdates()
     }
 }
