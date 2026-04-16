@@ -11,17 +11,25 @@ import android.location.LocationManager
 import android.os.Bundle
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.compass.app.CompassApplication
 import com.compass.app.data.preferences.UserPreferences
 import com.compass.app.domain.model.CompassReading
 import com.compass.app.domain.sensor.CompassSensor
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
-class CompassViewModel(application: Application) : AndroidViewModel(application) {
+private const val KEY_TARGET_ANGLE = "target_angle"
+
+class CompassViewModel(
+    application: Application,
+    private val savedState: SavedStateHandle,
+) : AndroidViewModel(application) {
 
     val prefs: UserPreferences = (application as CompassApplication).userPreferences
 
@@ -31,12 +39,23 @@ class CompassViewModel(application: Application) : AndroidViewModel(application)
 
     private var locationListener: LocationListener? = null
 
+    // Sensor flow — stateIn drives registration via WhileSubscribed. The ViewModel no longer
+    // needs onResume/onPause hooks; the composable's `collectAsStateWithLifecycle` controls it.
     val readings: StateFlow<CompassReading> =
         sensor.readings.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = CompassReading(),
+            initialValue = CompassReading(hasSensor = sensor.hasSensor),
         )
+
+    private val _targetAngle = MutableStateFlow(savedState.get<Float?>(KEY_TARGET_ANGLE))
+    val targetAngle: StateFlow<Float?> = _targetAngle.asStateFlow()
+
+    fun setTargetAngle(value: Float?) {
+        val normalised = value?.let { ((it % 360f) + 360f) % 360f }
+        _targetAngle.value = normalised
+        savedState[KEY_TARGET_ANGLE] = normalised
+    }
 
     init {
         viewModelScope.launch {
@@ -49,14 +68,6 @@ class CompassViewModel(application: Application) : AndroidViewModel(application)
                 }
             }
         }
-    }
-
-    fun onResume() {
-        sensor.start()
-    }
-
-    fun onPause() {
-        sensor.stop()
     }
 
     /** Called by UI after a successful permission grant to attach a location listener. */
@@ -98,7 +109,6 @@ class CompassViewModel(application: Application) : AndroidViewModel(application)
 
     override fun onCleared() {
         stopLocationUpdates()
-        sensor.stop()
         super.onCleared()
     }
 }
