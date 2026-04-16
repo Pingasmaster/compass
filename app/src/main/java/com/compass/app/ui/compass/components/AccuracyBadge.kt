@@ -21,7 +21,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.ExploreOff
 import androidx.compose.material3.ContainedLoadingIndicator
@@ -56,7 +56,7 @@ fun CalibrationBanner(
         Surface(
             color = MaterialTheme.colorScheme.errorContainer,
             contentColor = MaterialTheme.colorScheme.onErrorContainer,
-            shape = RoundedCornerShape(28.dp),
+            shape = MaterialTheme.shapes.extraLarge,
             modifier = Modifier.fillMaxWidth(),
         ) {
             Row(
@@ -127,7 +127,7 @@ fun AccuracyChip(
     Surface(
         color = container,
         contentColor = onContainer,
-        shape = RoundedCornerShape(50),
+        shape = CircleShape,
         modifier = modifier,
     ) {
         Row(
@@ -168,7 +168,7 @@ private fun AccuracyDot(color: Color) {
     Box(
         modifier = Modifier
             .size(8.dp)
-            .clip(RoundedCornerShape(50))
+            .clip(CircleShape)
             .background(color.copy(alpha = alpha)),
     )
 }
