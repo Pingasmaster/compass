@@ -109,6 +109,5 @@ class CompassViewModel(
 
     override fun onCleared() {
         stopLocationUpdates()
-        super.onCleared()
     }
 }

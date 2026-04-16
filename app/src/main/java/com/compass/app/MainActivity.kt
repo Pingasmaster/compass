@@ -1,7 +1,6 @@
 package com.compass.app
 
 import android.graphics.Color
-import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
@@ -18,11 +17,6 @@ import com.compass.app.ui.theme.CompassTheme
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            @Suppress("DEPRECATION")
-            window.isNavigationBarContrastEnforced = false
-        }
 
         val prefs = (application as CompassApplication).userPreferences
 
