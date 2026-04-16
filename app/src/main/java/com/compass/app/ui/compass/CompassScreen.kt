@@ -15,7 +15,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.GpsFixed
@@ -54,6 +57,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.compass.app.data.preferences.Responsiveness
 import com.compass.app.data.preferences.ThemeMode
 import com.compass.app.domain.model.toCardinal
 import com.compass.app.ui.compass.components.AccuracyChip
@@ -81,6 +85,7 @@ fun CompassScreen(viewModel: CompassViewModel = viewModel()) {
     val dynamicColor by viewModel.prefs.dynamicColorEnabled.collectAsStateWithLifecycle(initialValue = true)
     val oledBlack by viewModel.prefs.oledBlackEnabled.collectAsStateWithLifecycle(initialValue = false)
     val trueNorth by viewModel.prefs.trueNorthEnabled.collectAsStateWithLifecycle(initialValue = false)
+    val responsiveness by viewModel.prefs.responsiveness.collectAsStateWithLifecycle(initialValue = Responsiveness.NORMAL)
 
     var showSettings by remember { mutableStateOf(false) }
     var targetAngle by rememberSaveable { mutableStateOf<Float?>(null) }
@@ -128,6 +133,7 @@ fun CompassScreen(viewModel: CompassViewModel = viewModel()) {
                     isDark = isDark,
                     calibrating = reading.accuracy.needsCalibration,
                     targetAngle = targetAngle,
+                    responsiveness = responsiveness,
                     modifier = Modifier.fillMaxSize(),
                 )
             }
@@ -164,6 +170,7 @@ fun CompassScreen(viewModel: CompassViewModel = viewModel()) {
             dynamicColor = dynamicColor,
             oledBlack = oledBlack,
             trueNorth = trueNorth,
+            responsiveness = responsiveness,
             onThemeChange = { scope.launch { viewModel.prefs.setThemeMode(it) } },
             onDynamicColorChange = { scope.launch { viewModel.prefs.setDynamicColor(it) } },
             onOledBlackChange = { scope.launch { viewModel.prefs.setOledBlack(it) } },
@@ -175,6 +182,7 @@ fun CompassScreen(viewModel: CompassViewModel = viewModel()) {
                     scope.launch { viewModel.prefs.setTrueNorth(enabled) }
                 }
             },
+            onResponsivenessChange = { scope.launch { viewModel.prefs.setResponsiveness(it) } },
             onDismiss = { showSettings = false },
         )
     }
@@ -272,7 +280,7 @@ private fun TargetAngleSheet(
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "Drag the slider to set a heading you want to reach. The rose will show a green line at that bearing and the degree number tints green within ±10°.",
+                text = "Drag the slider to set a heading you want to reach. The rose will show a coloured line at that bearing and the degree number tints to match within ±10°.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -287,7 +295,7 @@ private fun TargetAngleSheet(
                 Text(
                     text = "${bearing.toInt()}",
                     style = MaterialTheme.typography.displayLarge,
-                    color = MaterialTheme.colorScheme.primary,
+                    color = MaterialTheme.colorScheme.tertiary,
                 )
                 Text(
                     text = "°  ${bearing.toCardinal()}",
@@ -299,16 +307,73 @@ private fun TargetAngleSheet(
 
             Spacer(Modifier.height(8.dp))
 
-            Slider(
-                value = bearing,
-                onValueChange = { bearing = it },
-                valueRange = 0f..360f,
-                steps = 7, // ticks at N NE E SE S SW W NW
-                colors = SliderDefaults.colors(),
+            // M3 Slider with a floating value indicator (pill above thumb during drag).
+            val interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+            val isDragged by interactionSource.collectIsDraggedAsState()
+            val isPressed by interactionSource.collectIsPressedAsState()
+            val showIndicator = isDragged || isPressed
+
+            androidx.compose.foundation.layout.BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = 4.dp),
-            )
+            ) {
+                val density = androidx.compose.ui.platform.LocalDensity.current
+                val trackWidthPx = with(density) { maxWidth.toPx() }
+                val fraction = (bearing / 360f).coerceIn(0f, 1f)
+                // Thumb radius ≈ 10dp; label should sit above the thumb, centered.
+                val labelWidthDp = 56.dp
+                val indicatorOffsetX = with(density) {
+                    (fraction * trackWidthPx - labelWidthDp.toPx() / 2f).toDp()
+                }.coerceIn(0.dp, maxWidth - labelWidthDp)
+
+                Column {
+                    androidx.compose.foundation.layout.Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(40.dp),
+                    ) {
+                        androidx.compose.animation.AnimatedVisibility(
+                            visible = showIndicator,
+                            enter = androidx.compose.animation.fadeIn() +
+                                androidx.compose.animation.scaleIn(),
+                            exit = androidx.compose.animation.fadeOut() +
+                                androidx.compose.animation.scaleOut(),
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .offset(x = indicatorOffsetX),
+                        ) {
+                            androidx.compose.material3.Surface(
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(50),
+                                color = MaterialTheme.colorScheme.inverseSurface,
+                                contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+                                modifier = Modifier.width(labelWidthDp),
+                            ) {
+                                Text(
+                                    text = "${bearing.toInt()}°",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                                )
+                            }
+                        }
+                    }
+                    Slider(
+                        value = bearing,
+                        onValueChange = { bearing = it },
+                        valueRange = 0f..360f,
+                        steps = 7, // ticks at N NE E SE S SW W NW
+                        colors = SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.tertiary,
+                            activeTrackColor = MaterialTheme.colorScheme.tertiary,
+                        ),
+                        interactionSource = interactionSource,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
 
             // Cardinal labels under the slider for context.
             Row(

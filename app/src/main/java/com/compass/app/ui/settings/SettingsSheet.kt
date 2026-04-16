@@ -27,6 +27,7 @@ import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
+import com.compass.app.data.preferences.Responsiveness
 import com.compass.app.data.preferences.ThemeMode
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -36,10 +37,12 @@ fun SettingsSheet(
     dynamicColor: Boolean,
     oledBlack: Boolean,
     trueNorth: Boolean,
+    responsiveness: Responsiveness,
     onThemeChange: (ThemeMode) -> Unit,
     onDynamicColorChange: (Boolean) -> Unit,
     onOledBlackChange: (Boolean) -> Unit,
     onTrueNorthChange: (Boolean) -> Unit,
+    onResponsivenessChange: (Responsiveness) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -96,6 +99,52 @@ fun SettingsSheet(
                         modifier = Modifier.weight(1f),
                     ) {
                         Text(text = label)
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(20.dp))
+
+            SectionLabel("Rose responsiveness")
+            // Same connected-ToggleButton pattern as the theme picker — M3E segmented.
+            val responsivenessOptions = Responsiveness.entries
+            val respSelectedIndex = responsivenessOptions.indexOf(responsiveness)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .selectableGroup(),
+                horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+            ) {
+                responsivenessOptions.forEachIndexed { index, mode ->
+                    val label = when (mode) {
+                        Responsiveness.SLOWEST -> "Slowest"
+                        Responsiveness.SLOW -> "Slow"
+                        Responsiveness.NORMAL -> "Normal"
+                        Responsiveness.FAST -> "Fast"
+                        Responsiveness.FASTEST -> "Fastest"
+                    }
+                    val shapes = when (index) {
+                        0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                        responsivenessOptions.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                        else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                    }
+                    ToggleButton(
+                        checked = index == respSelectedIndex,
+                        onCheckedChange = { checked ->
+                            if (checked) {
+                                haptics.tick()
+                                onResponsivenessChange(mode)
+                            }
+                        },
+                        shapes = shapes,
+                        modifier = Modifier.weight(1f),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 10.dp),
+                    ) {
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelSmall,
+                            maxLines = 1,
+                        )
                     }
                 }
             }
