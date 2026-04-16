@@ -20,7 +20,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.GpsFixed
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
@@ -28,10 +29,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.IconButtonShapes
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,6 +55,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.compass.app.data.preferences.ThemeMode
+import com.compass.app.domain.model.toCardinal
 import com.compass.app.ui.compass.components.AccuracyChip
 import com.compass.app.ui.compass.components.CalibrationBanner
 import com.compass.app.ui.compass.components.CompassRose
@@ -142,7 +148,7 @@ fun CompassScreen(viewModel: CompassViewModel = viewModel()) {
     }
 
     if (showTargetDialog) {
-        TargetAngleDialog(
+        TargetAngleSheet(
             currentTarget = targetAngle,
             onConfirm = { value ->
                 targetAngle = value
@@ -238,52 +244,108 @@ private fun TopBar(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TargetAngleDialog(
+private fun TargetAngleSheet(
     currentTarget: Float?,
     onConfirm: (Float?) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var text by remember {
-        mutableStateOf(currentTarget?.toInt()?.toString().orEmpty())
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var bearing by remember {
+        mutableFloatStateOf(currentTarget?.coerceIn(0f, 360f) ?: 0f)
     }
-    val parsed = text.toFloatOrNull()
-    val valid = text.isBlank() || (parsed != null && parsed in 0f..360f)
 
-    AlertDialog(
+    ModalBottomSheet(
         onDismissRequest = onDismiss,
-        title = { Text("Target angle") },
-        text = {
-            Column {
+        sheetState = sheetState,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 8.dp),
+        ) {
+            Text(
+                text = "Target bearing",
+                style = MaterialTheme.typography.headlineSmall,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = "Drag the slider to set a heading you want to reach. The rose will show a green line at that bearing and the degree number tints green within ±10°.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            Spacer(Modifier.height(24.dp))
+
+            Row(
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 Text(
-                    text = "Enter a bearing (0–360°). Leave blank to clear.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    text = "${bearing.toInt()}",
+                    style = MaterialTheme.typography.displayLarge,
+                    color = MaterialTheme.colorScheme.primary,
                 )
-                Spacer(Modifier.height(12.dp))
-                OutlinedTextField(
-                    value = text,
-                    onValueChange = { text = it.filter { ch -> ch.isDigit() || ch == '.' } },
-                    singleLine = true,
-                    isError = !valid,
-                    label = { Text("Degrees") },
-                    trailingIcon = { Text("°", style = MaterialTheme.typography.titleLarge) },
+                Text(
+                    text = "°  ${bearing.toCardinal()}",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 8.dp, bottom = 6.dp),
                 )
             }
-        },
-        confirmButton = {
-            TextButton(
-                enabled = valid,
-                onClick = {
-                    val value = text.toFloatOrNull()
-                    onConfirm(value?.let { ((it % 360f) + 360f) % 360f })
-                },
-            ) { Text(if (text.isBlank()) "Clear" else "Set") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        },
-    )
+
+            Spacer(Modifier.height(8.dp))
+
+            Slider(
+                value = bearing,
+                onValueChange = { bearing = it },
+                valueRange = 0f..360f,
+                steps = 7, // ticks at N NE E SE S SW W NW
+                colors = SliderDefaults.colors(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp),
+            )
+
+            // Cardinal labels under the slider for context.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                listOf("N", "NE", "E", "SE", "S", "SW", "W", "NW", "N").forEach { label ->
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                TextButton(onClick = {
+                    onConfirm(null)
+                }) { Text("Clear") }
+                Spacer(Modifier.width(8.dp))
+                TextButton(onClick = onDismiss) { Text("Cancel") }
+                Spacer(Modifier.width(8.dp))
+                Button(onClick = {
+                    onConfirm(((bearing % 360f) + 360f) % 360f)
+                }) { Text("Set") }
+            }
+
+            Spacer(Modifier.height(16.dp))
+        }
+    }
 }
 
 @Composable

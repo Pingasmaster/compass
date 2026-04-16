@@ -8,7 +8,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.ButtonGroup
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
@@ -16,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -58,13 +61,17 @@ fun SettingsSheet(
             )
 
             SectionLabel("Theme")
-            // M3 Expressive ButtonGroup with toggleable items — shape morphs between
-            // round (unchecked) and square (checked), with press-state animation built in.
+            // Connected M3 Expressive segmented selector — ToggleButtons with
+            // connectedLeading/Middle/TrailingButtonShapes, which morphs the selected
+            // button to a rounded pill while neighbours compress (this is the
+            // Expressive refresh of the classic SingleChoiceSegmentedButtonRow).
             val themeOptions = listOf(ThemeMode.SYSTEM, ThemeMode.LIGHT, ThemeMode.DARK)
             val selectedIndex = themeOptions.indexOf(themeMode)
-            ButtonGroup(
-                overflowIndicator = {},
-                modifier = Modifier.fillMaxWidth(),
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .selectableGroup(),
+                horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
             ) {
                 themeOptions.forEachIndexed { index, mode ->
                     val label = when (mode) {
@@ -72,18 +79,24 @@ fun SettingsSheet(
                         ThemeMode.LIGHT -> "Light"
                         ThemeMode.DARK -> "Dark"
                     }
-                    toggleableItem(
-                        /* checked =          */ index == selectedIndex,
-                        /* label =            */ label,
-                        /* onCheckedChange =  */ { checked ->
+                    val shapes = when (index) {
+                        0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                        themeOptions.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                        else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                    }
+                    ToggleButton(
+                        checked = index == selectedIndex,
+                        onCheckedChange = { checked ->
                             if (checked) {
                                 haptics.tick()
                                 onThemeChange(mode)
                             }
                         },
-                        /* icon/content =     */ { Text(text = label) },
-                        /* weight =           */ 1f,
-                    )
+                        shapes = shapes,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(text = label)
+                    }
                 }
             }
 
