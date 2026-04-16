@@ -87,7 +87,10 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun CompassScreen(viewModel: CompassViewModel = viewModel()) {
+fun CompassScreen(
+    isDark: Boolean,
+    viewModel: CompassViewModel = viewModel(),
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -95,9 +98,6 @@ fun CompassScreen(viewModel: CompassViewModel = viewModel()) {
     // CompassSensor), so `collectAsStateWithLifecycle` is what starts and stops it —
     // no separate DisposableLifecycle needed.
     val reading by viewModel.readings.collectAsStateWithLifecycle()
-    val themeMode by viewModel.prefs.themeMode.collectAsStateWithLifecycle(initialValue = ThemeMode.SYSTEM)
-    val dynamicColor by viewModel.prefs.dynamicColorEnabled.collectAsStateWithLifecycle(initialValue = true)
-    val oledBlack by viewModel.prefs.oledBlackEnabled.collectAsStateWithLifecycle(initialValue = false)
     val trueNorth by viewModel.prefs.trueNorthEnabled.collectAsStateWithLifecycle(initialValue = false)
     val responsiveness by viewModel.prefs.responsiveness.collectAsStateWithLifecycle(initialValue = Responsiveness.NORMAL)
     val targetAngle by viewModel.targetAngle.collectAsStateWithLifecycle()
@@ -114,8 +114,6 @@ fun CompassScreen(viewModel: CompassViewModel = viewModel()) {
             scope.launch { viewModel.prefs.setTrueNorth(false) }
         }
     }
-
-    val isDark = isSystemInDarkThemeEffective(themeMode)
 
     Scaffold(
         topBar = {
@@ -224,6 +222,9 @@ fun CompassScreen(viewModel: CompassViewModel = viewModel()) {
     }
 
     if (showSettings) {
+        val themeMode by viewModel.prefs.themeMode.collectAsStateWithLifecycle(initialValue = ThemeMode.SYSTEM)
+        val dynamicColor by viewModel.prefs.dynamicColorEnabled.collectAsStateWithLifecycle(initialValue = true)
+        val oledBlack by viewModel.prefs.oledBlackEnabled.collectAsStateWithLifecycle(initialValue = false)
         SettingsSheet(
             themeMode = themeMode,
             dynamicColor = dynamicColor,
@@ -440,16 +441,6 @@ private fun TargetAngleSheet(
 
             Spacer(Modifier.height(16.dp))
         }
-    }
-}
-
-@Composable
-private fun isSystemInDarkThemeEffective(themeMode: ThemeMode): Boolean {
-    val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
-    return when (themeMode) {
-        ThemeMode.SYSTEM -> systemDark
-        ThemeMode.LIGHT -> false
-        ThemeMode.DARK -> true
     }
 }
 

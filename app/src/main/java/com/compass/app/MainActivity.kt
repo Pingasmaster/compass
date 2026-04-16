@@ -54,7 +54,7 @@ class MainActivity : ComponentActivity() {
                 dynamicColor = dynamicColor,
                 oledBlack = oledBlack,
             ) {
-                CompassScreen()
+                CompassScreen(isDark = isDark)
             }
         }
     }
