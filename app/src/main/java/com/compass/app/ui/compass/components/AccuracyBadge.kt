@@ -36,7 +36,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.compass.app.R
 import com.compass.app.domain.model.CompassAccuracy
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -70,11 +72,11 @@ fun CalibrationBanner(
                 Spacer(Modifier.width(16.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
-                        text = "Calibration needed",
+                        text = stringResource(R.string.calibration_banner_title),
                         style = MaterialTheme.typography.titleMedium,
                     )
                     Text(
-                        text = "Move your phone in a figure-8 a few times.",
+                        text = stringResource(R.string.calibration_banner_body),
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
@@ -89,34 +91,34 @@ fun AccuracyChip(
     hasSensor: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val (label, container, onContainer) = when {
+    val (labelRes, container, onContainer) = when {
         !hasSensor -> Triple(
-            "No sensor",
+            R.string.accuracy_no_sensor,
             MaterialTheme.colorScheme.errorContainer,
             MaterialTheme.colorScheme.onErrorContainer,
         )
         accuracy == CompassAccuracy.HIGH -> Triple(
-            "High accuracy",
+            R.string.accuracy_high,
             MaterialTheme.colorScheme.primaryContainer,
             MaterialTheme.colorScheme.onPrimaryContainer,
         )
         accuracy == CompassAccuracy.MEDIUM -> Triple(
-            "Medium accuracy",
+            R.string.accuracy_medium,
             MaterialTheme.colorScheme.secondaryContainer,
             MaterialTheme.colorScheme.onSecondaryContainer,
         )
         accuracy == CompassAccuracy.LOW -> Triple(
-            "Low accuracy",
+            R.string.accuracy_low,
             MaterialTheme.colorScheme.tertiaryContainer,
             MaterialTheme.colorScheme.onTertiaryContainer,
         )
         accuracy == CompassAccuracy.UNRELIABLE -> Triple(
-            "Unreliable",
+            R.string.accuracy_unreliable,
             MaterialTheme.colorScheme.errorContainer,
             MaterialTheme.colorScheme.onErrorContainer,
         )
         else -> Triple(
-            "Calibrating…",
+            R.string.accuracy_unknown,
             MaterialTheme.colorScheme.surfaceContainerHigh,
             MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -144,7 +146,7 @@ fun AccuracyChip(
                 Spacer(Modifier.width(8.dp))
             }
             Text(
-                text = label,
+                text = stringResource(labelRes),
                 style = MaterialTheme.typography.labelLarge,
             )
         }

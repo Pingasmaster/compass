@@ -46,13 +46,20 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.compass.app.R
 import com.compass.app.data.preferences.Responsiveness
 import com.compass.app.data.preferences.ThemeMode
 import com.compass.app.domain.model.toCardinal
@@ -114,11 +121,28 @@ fun CompassScreen(viewModel: CompassViewModel = viewModel()) {
 
             // Rose fills the available width (up to 520dp) as a plain transparent
             // square — the expressive cookie shape lives inside CompassRose itself.
+            // Throttle the TalkBack description: only recompute on cardinal change or
+            // crossing a 10° bucket, so we don't read out every sensor tick.
+            val roseBucket by remember {
+                derivedStateOf {
+                    val cardinal = reading.azimuth.toCardinal()
+                    val bucketed = ((reading.azimuth / 10f).roundToInt() * 10 + 360) % 360
+                    cardinal to bucketed
+                }
+            }
+            val roseDescription = stringResource(
+                R.string.rose_content_description,
+                roseBucket.second,
+                roseBucket.first,
+            )
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 520.dp)
-                    .aspectRatio(1f),
+                    .aspectRatio(1f)
+                    .semantics(mergeDescendants = true) {
+                        contentDescription = roseDescription
+                    },
             ) {
                 CompassRose(
                     azimuthDegrees = reading.azimuth,
@@ -192,7 +216,7 @@ private fun TopBar(
     Box(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.align(Alignment.CenterStart)) {
             Text(
-                text = "Compass",
+                text = stringResource(R.string.title_compass),
                 style = MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurface,
             )
@@ -219,7 +243,7 @@ private fun TopBar(
             ) {
                 Icon(
                     imageVector = Icons.Rounded.GpsFixed,
-                    contentDescription = "Set target angle",
+                    contentDescription = stringResource(R.string.action_set_target_angle),
                 )
             }
             Spacer(Modifier.width(8.dp))
@@ -237,7 +261,7 @@ private fun TopBar(
             ) {
                 Icon(
                     imageVector = Icons.Rounded.Settings,
-                    contentDescription = "Settings",
+                    contentDescription = stringResource(R.string.action_settings),
                 )
             }
         }
@@ -267,12 +291,12 @@ private fun TargetAngleSheet(
                 .padding(horizontal = 24.dp, vertical = 8.dp),
         ) {
             Text(
-                text = "Target bearing",
+                text = stringResource(R.string.target_sheet_title),
                 style = MaterialTheme.typography.headlineSmall,
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "Drag the slider to set a heading you want to reach. The rose will show a coloured line at that bearing and the degree number tints to match within ±10°.",
+                text = stringResource(R.string.target_sheet_body),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -339,10 +363,13 @@ private fun TargetAngleSheet(
                                 shape = androidx.compose.foundation.shape.RoundedCornerShape(50),
                                 color = MaterialTheme.colorScheme.inverseSurface,
                                 contentColor = MaterialTheme.colorScheme.inverseOnSurface,
-                                modifier = Modifier.width(labelWidthDp),
+                                modifier = Modifier
+                                    .width(labelWidthDp)
+                                    // Decorative — the Slider itself announces the value.
+                                    .clearAndSetSemantics {},
                             ) {
                                 Text(
-                                    text = "${bearing.toInt()}°",
+                                    text = stringResource(R.string.target_sheet_value_label, bearing.toInt()),
                                     style = MaterialTheme.typography.labelLarge,
                                     textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                                     modifier = Modifier
@@ -391,13 +418,15 @@ private fun TargetAngleSheet(
             ) {
                 TextButton(onClick = {
                     onConfirm(null)
-                }) { Text("Clear") }
+                }) { Text(stringResource(R.string.target_sheet_clear)) }
                 Spacer(Modifier.width(8.dp))
-                TextButton(onClick = onDismiss) { Text("Cancel") }
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.target_sheet_cancel))
+                }
                 Spacer(Modifier.width(8.dp))
                 Button(onClick = {
                     onConfirm(((bearing % 360f) + 360f) % 360f)
-                }) { Text("Set") }
+                }) { Text(stringResource(R.string.target_sheet_set)) }
             }
 
             Spacer(Modifier.height(16.dp))

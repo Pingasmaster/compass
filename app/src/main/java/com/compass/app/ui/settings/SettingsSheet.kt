@@ -26,7 +26,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.annotation.StringRes
+import com.compass.app.R
 import com.compass.app.data.preferences.Responsiveness
 import com.compass.app.data.preferences.ThemeMode
 
@@ -58,12 +61,12 @@ fun SettingsSheet(
                 .padding(horizontal = 24.dp, vertical = 8.dp),
         ) {
             Text(
-                text = "Settings",
+                text = stringResource(R.string.settings_title),
                 style = MaterialTheme.typography.headlineSmall,
                 modifier = Modifier.padding(bottom = 16.dp),
             )
 
-            SectionLabel("Theme")
+            SectionLabel(stringResource(R.string.settings_theme_label))
             // Connected M3 Expressive segmented selector — ToggleButtons with
             // connectedLeading/Middle/TrailingButtonShapes, which morphs the selected
             // button to a rounded pill while neighbours compress (this is the
@@ -77,10 +80,10 @@ fun SettingsSheet(
                 horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
             ) {
                 themeOptions.forEachIndexed { index, mode ->
-                    val label = when (mode) {
-                        ThemeMode.SYSTEM -> "System"
-                        ThemeMode.LIGHT -> "Light"
-                        ThemeMode.DARK -> "Dark"
+                    val labelRes = when (mode) {
+                        ThemeMode.SYSTEM -> R.string.settings_theme_system
+                        ThemeMode.LIGHT -> R.string.settings_theme_light
+                        ThemeMode.DARK -> R.string.settings_theme_dark
                     }
                     val shapes = when (index) {
                         0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
@@ -98,14 +101,14 @@ fun SettingsSheet(
                         shapes = shapes,
                         modifier = Modifier.weight(1f),
                     ) {
-                        Text(text = label)
+                        Text(text = stringResource(labelRes))
                     }
                 }
             }
 
             Spacer(Modifier.height(20.dp))
 
-            SectionLabel("Rose responsiveness")
+            SectionLabel(stringResource(R.string.settings_responsiveness_label))
             // Same connected-ToggleButton pattern as the theme picker — M3E segmented.
             val responsivenessOptions = Responsiveness.entries
             val respSelectedIndex = responsivenessOptions.indexOf(responsiveness)
@@ -116,12 +119,12 @@ fun SettingsSheet(
                 horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
             ) {
                 responsivenessOptions.forEachIndexed { index, mode ->
-                    val label = when (mode) {
-                        Responsiveness.SLOWEST -> "Slowest"
-                        Responsiveness.SLOW -> "Slow"
-                        Responsiveness.NORMAL -> "Normal"
-                        Responsiveness.FAST -> "Fast"
-                        Responsiveness.FASTEST -> "Fastest"
+                    val labelRes = when (mode) {
+                        Responsiveness.SLOWEST -> R.string.settings_responsiveness_slowest
+                        Responsiveness.SLOW -> R.string.settings_responsiveness_slow
+                        Responsiveness.NORMAL -> R.string.settings_responsiveness_normal
+                        Responsiveness.FAST -> R.string.settings_responsiveness_fast
+                        Responsiveness.FASTEST -> R.string.settings_responsiveness_fastest
                     }
                     val shapes = when (index) {
                         0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
@@ -141,7 +144,7 @@ fun SettingsSheet(
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 10.dp),
                     ) {
                         Text(
-                            text = label,
+                            text = stringResource(labelRes),
                             style = MaterialTheme.typography.labelSmall,
                             maxLines = 1,
                         )
@@ -154,20 +157,20 @@ fun SettingsSheet(
             Spacer(Modifier.height(12.dp))
 
             ToggleRow(
-                title = "Dynamic color",
-                subtitle = "Follow system wallpaper colors",
+                titleRes = R.string.settings_dynamic_color,
+                subtitleRes = R.string.settings_dynamic_color_desc,
                 checked = dynamicColor,
                 onCheckedChange = { haptics.tick(); onDynamicColorChange(it) },
             )
             ToggleRow(
-                title = "OLED dark theme",
-                subtitle = "Pure black background in dark mode",
+                titleRes = R.string.settings_oled_dark,
+                subtitleRes = R.string.settings_oled_dark_desc,
                 checked = oledBlack,
                 onCheckedChange = { haptics.tick(); onOledBlackChange(it) },
             )
             ToggleRow(
-                title = "True north",
-                subtitle = "Correct heading with local magnetic declination",
+                titleRes = R.string.settings_true_north,
+                subtitleRes = R.string.settings_true_north_desc,
                 checked = trueNorth,
                 onCheckedChange = { haptics.tick(); onTrueNorthChange(it) },
             )
@@ -192,8 +195,8 @@ private fun SectionLabel(label: String) {
 
 @Composable
 private fun ToggleRow(
-    title: String,
-    subtitle: String,
+    @StringRes titleRes: Int,
+    @StringRes subtitleRes: Int,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
 ) {
@@ -206,11 +209,11 @@ private fun ToggleRow(
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = title,
+                text = stringResource(titleRes),
                 style = MaterialTheme.typography.bodyLarge,
             )
             Text(
-                text = subtitle,
+                text = stringResource(subtitleRes),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
