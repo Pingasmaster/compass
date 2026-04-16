@@ -15,22 +15,29 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.GpsFixed
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.IconButtonShapes
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -70,6 +77,8 @@ fun CompassScreen(viewModel: CompassViewModel = viewModel()) {
     val trueNorth by viewModel.prefs.trueNorthEnabled.collectAsStateWithLifecycle(initialValue = false)
 
     var showSettings by remember { mutableStateOf(false) }
+    var targetAngle by rememberSaveable { mutableStateOf<Float?>(null) }
+    var showTargetDialog by remember { mutableStateOf(false) }
 
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
@@ -84,57 +93,63 @@ fun CompassScreen(viewModel: CompassViewModel = viewModel()) {
     val isDark = isSystemInDarkThemeEffective(themeMode)
 
     Scaffold { innerPadding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .safeDrawingPadding(),
+                .padding(horizontal = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Column(
+            TopBar(
+                hasSensor = reading.hasSensor,
+                accuracyLabel = reading.accuracy,
+                targetAngle = targetAngle,
+                onTarget = { showTargetDialog = true },
+                onSettings = { showSettings = true },
+            )
+
+            // Rose fills the available width (up to 520dp) as a plain transparent
+            // square — the expressive cookie shape lives inside CompassRose itself.
+            Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                    .fillMaxWidth()
+                    .widthIn(max = 520.dp)
+                    .aspectRatio(1f),
             ) {
-                TopBar(
-                    hasSensor = reading.hasSensor,
-                    accuracyLabel = reading.accuracy,
-                    onSettings = { showSettings = true },
-                )
-
-                Spacer(Modifier.height(8.dp))
-
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .widthIn(max = 520.dp)
-                        .aspectRatio(1f),
-                    color = MaterialTheme.colorScheme.surface,
-                ) {
-                    CompassRose(
-                        azimuthDegrees = reading.azimuth,
-                        isDark = isDark,
-                        calibrating = reading.accuracy.needsCalibration,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                }
-
-                Spacer(Modifier.height(8.dp))
-
-                HeadingReadout(
+                CompassRose(
                     azimuthDegrees = reading.azimuth,
-                    isTrueNorth = trueNorth,
-                    declination = reading.declination,
+                    isDark = isDark,
+                    calibrating = reading.accuracy.needsCalibration,
+                    targetAngle = targetAngle,
+                    modifier = Modifier.fillMaxSize(),
                 )
-
-                Spacer(Modifier.weight(1f))
-
-                CalibrationBanner(accuracy = reading.accuracy)
-
-                Spacer(Modifier.height(8.dp))
             }
+
+            HeadingReadout(
+                azimuthDegrees = reading.azimuth,
+                isTrueNorth = trueNorth,
+                declination = reading.declination,
+                targetAngle = targetAngle,
+            )
+
+            Spacer(Modifier.weight(1f))
+
+            CalibrationBanner(accuracy = reading.accuracy)
+
+            Spacer(Modifier.height(8.dp))
         }
+    }
+
+    if (showTargetDialog) {
+        TargetAngleDialog(
+            currentTarget = targetAngle,
+            onConfirm = { value ->
+                targetAngle = value
+                showTargetDialog = false
+            },
+            onDismiss = { showTargetDialog = false },
+        )
     }
 
     if (showSettings) {
@@ -164,6 +179,8 @@ fun CompassScreen(viewModel: CompassViewModel = viewModel()) {
 private fun TopBar(
     hasSensor: Boolean,
     accuracyLabel: com.compass.app.domain.model.CompassAccuracy,
+    targetAngle: Float?,
+    onTarget: () -> Unit,
     onSettings: () -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxWidth()) {
@@ -179,25 +196,94 @@ private fun TopBar(
                 modifier = Modifier.padding(top = 4.dp),
             )
         }
-        // M3 Expressive FilledIconButton — morphs from round to small pressed shape on press.
-        FilledIconButton(
-            onClick = onSettings,
-            shapes = IconButtonShapes(
-                shape = IconButtonDefaults.mediumRoundShape,
-                pressedShape = IconButtonDefaults.mediumPressedShape,
-            ),
-            colors = IconButtonDefaults.filledIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
-            ),
-            modifier = Modifier.align(Alignment.CenterEnd),
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.Settings,
-                contentDescription = "Settings",
-            )
+        Row(modifier = Modifier.align(Alignment.CenterEnd)) {
+            val targetActive = targetAngle != null
+            FilledTonalIconButton(
+                onClick = onTarget,
+                shapes = IconButtonShapes(
+                    shape = IconButtonDefaults.mediumRoundShape,
+                    pressedShape = IconButtonDefaults.mediumPressedShape,
+                ),
+                colors = IconButtonDefaults.filledTonalIconButtonColors(
+                    containerColor = if (targetActive) MaterialTheme.colorScheme.tertiaryContainer
+                        else MaterialTheme.colorScheme.surfaceContainerHigh,
+                    contentColor = if (targetActive) MaterialTheme.colorScheme.onTertiaryContainer
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                ),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.GpsFixed,
+                    contentDescription = "Set target angle",
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            // M3 Expressive FilledIconButton — morphs from round to small pressed shape on press.
+            FilledIconButton(
+                onClick = onSettings,
+                shapes = IconButtonShapes(
+                    shape = IconButtonDefaults.mediumRoundShape,
+                    pressedShape = IconButtonDefaults.mediumPressedShape,
+                ),
+                colors = IconButtonDefaults.filledIconButtonColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                ),
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Settings,
+                    contentDescription = "Settings",
+                )
+            }
         }
     }
+}
+
+@Composable
+private fun TargetAngleDialog(
+    currentTarget: Float?,
+    onConfirm: (Float?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var text by remember {
+        mutableStateOf(currentTarget?.toInt()?.toString().orEmpty())
+    }
+    val parsed = text.toFloatOrNull()
+    val valid = text.isBlank() || (parsed != null && parsed in 0f..360f)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Target angle") },
+        text = {
+            Column {
+                Text(
+                    text = "Enter a bearing (0–360°). Leave blank to clear.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(12.dp))
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it.filter { ch -> ch.isDigit() || ch == '.' } },
+                    singleLine = true,
+                    isError = !valid,
+                    label = { Text("Degrees") },
+                    trailingIcon = { Text("°", style = MaterialTheme.typography.titleLarge) },
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = valid,
+                onClick = {
+                    val value = text.toFloatOrNull()
+                    onConfirm(value?.let { ((it % 360f) + 360f) % 360f })
+                },
+            ) { Text(if (text.isBlank()) "Clear" else "Set") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
 }
 
 @Composable

@@ -59,6 +59,8 @@ fun CompassRose(
     modifier: Modifier = Modifier,
     isDark: Boolean,
     calibrating: Boolean = false,
+    targetAngle: Float? = null,
+    onTargetHitColor: Color = Color(0xFF2EB872),
 ) {
     val cumulativeAngle = remember { Animatable(0f) }
     LaunchedEffect(azimuthDegrees) {
@@ -111,13 +113,14 @@ fun CompassRose(
             val h = size.height
             val cx = w / 2f
             val cy = h / 2f
-            val radius = minOf(w, h) / 2f * 0.92f
+            // Outer cookie now fills the canvas fully (minus a 2dp stroke margin).
+            val outerRadius = minOf(w, h) / 2f - 2.dp.toPx()
 
             // Expressive background disc: interpolate Cookie ↔ Flower when calibrating.
             val discPath = if (calibrating) {
-                morphPath(morph, morphProgress, cx, cy, radius, cumulativeAngle.value)
+                morphPath(morph, morphProgress, cx, cy, outerRadius, cumulativeAngle.value)
             } else {
-                roundedPolygonPath(cookie, cx, cy, radius, cumulativeAngle.value)
+                roundedPolygonPath(cookie, cx, cy, outerRadius, cumulativeAngle.value)
             }
             drawPath(path = discPath, color = surfaceContainerHigh)
             drawPath(
@@ -126,8 +129,8 @@ fun CompassRose(
                 style = Stroke(width = 2.dp.toPx()),
             )
 
-            // Inner plain disc for the rose itself.
-            val innerRadius = radius * 0.78f
+            // Inner rose disc — clearly smaller so the cookie ring is visible all around.
+            val innerRadius = outerRadius * 0.62f
             drawCircle(
                 color = surfaceContainer,
                 radius = innerRadius,
@@ -139,7 +142,7 @@ fun CompassRose(
                 drawTicks(
                     centerX = cx,
                     centerY = cy,
-                    outerRadius = innerRadius * 0.98f,
+                    outerRadius = innerRadius * 0.96f,
                     majorColor = onSurface,
                     minorColor = onSurfaceVariant,
                 )
@@ -147,18 +150,30 @@ fun CompassRose(
                     textMeasurer = textMeasurer,
                     centerX = cx,
                     centerY = cy,
-                    radius = innerRadius * 0.70f,
+                    radius = innerRadius * 0.72f,
                     cardinalStyle = cardinalStyle,
                     intercardinalStyle = intercardinalStyle,
                     northColor = needleNorth,
                     otherColor = onSurface,
                     subColor = onSurfaceVariant,
                 )
+
+                // Target line — rotates with the rose so it stays locked to the cardinal
+                // direction the user chose, regardless of the phone's orientation.
+                if (targetAngle != null) {
+                    drawTargetLine(
+                        centerX = cx,
+                        centerY = cy,
+                        radius = outerRadius * 0.98f,
+                        angleDeg = targetAngle,
+                        color = onTargetHitColor,
+                    )
+                }
             }
 
             // Fixed needle.
-            val needleLen = innerRadius * 0.90f
-            val needleHalfWidth = radius * 0.055f
+            val needleLen = innerRadius * 0.92f
+            val needleHalfWidth = outerRadius * 0.045f
             drawNeedle(
                 centerX = cx,
                 centerY = cy,
@@ -169,11 +184,11 @@ fun CompassRose(
             )
 
             // Hub.
-            drawCircle(color = primary, radius = radius * 0.055f, center = Offset(cx, cy))
-            drawCircle(color = onPrimary, radius = radius * 0.022f, center = Offset(cx, cy))
+            drawCircle(color = primary, radius = outerRadius * 0.05f, center = Offset(cx, cy))
+            drawCircle(color = onPrimary, radius = outerRadius * 0.02f, center = Offset(cx, cy))
 
-            // Fixed top indicator triangle.
-            val tipY = cy - radius
+            // Fixed top indicator triangle (outside the cookie).
+            val tipY = cy - outerRadius - 6.dp.toPx()
             val trianglePath = ComposePath().apply {
                 moveTo(cx, tipY - 10.dp.toPx())
                 lineTo(cx - 10.dp.toPx(), tipY + 8.dp.toPx())
@@ -222,6 +237,34 @@ private fun morphPath(
         transform(matrix)
     }
     return android.asComposePath()
+}
+
+private fun DrawScope.drawTargetLine(
+    centerX: Float,
+    centerY: Float,
+    radius: Float,
+    angleDeg: Float,
+    color: Color,
+) {
+    // angle 0° points north (up); x-axis in screen coords goes right.
+    rotate(degrees = angleDeg, pivot = Offset(centerX, centerY)) {
+        drawLine(
+            color = color.copy(alpha = 0.95f),
+            start = Offset(centerX, centerY),
+            end = Offset(centerX, centerY - radius),
+            strokeWidth = 4.dp.toPx(),
+            cap = StrokeCap.Round,
+        )
+        // Small arrowhead at the tip for directionality.
+        val tip = Offset(centerX, centerY - radius)
+        val path = ComposePath().apply {
+            moveTo(tip.x, tip.y - 4.dp.toPx())
+            lineTo(tip.x - 7.dp.toPx(), tip.y + 6.dp.toPx())
+            lineTo(tip.x + 7.dp.toPx(), tip.y + 6.dp.toPx())
+            close()
+        }
+        drawPath(path, color = color)
+    }
 }
 
 private fun DrawScope.drawTicks(

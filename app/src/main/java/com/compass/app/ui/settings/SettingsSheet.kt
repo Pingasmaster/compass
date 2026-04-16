@@ -1,7 +1,6 @@
 package com.compass.app.ui.settings
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -9,26 +8,25 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import com.compass.app.data.preferences.ThemeMode
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SettingsSheet(
     themeMode: ThemeMode,
@@ -60,24 +58,36 @@ fun SettingsSheet(
             )
 
             SectionLabel("Theme")
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                ThemeMode.entries.forEach { mode ->
-                    ThemeRadioRow(
-                        label = when (mode) {
-                            ThemeMode.SYSTEM -> "System"
-                            ThemeMode.LIGHT -> "Light"
-                            ThemeMode.DARK -> "Dark"
+            // M3 Expressive ButtonGroup with toggleable items — shape morphs between
+            // round (unchecked) and square (checked), with press-state animation built in.
+            val themeOptions = listOf(ThemeMode.SYSTEM, ThemeMode.LIGHT, ThemeMode.DARK)
+            val selectedIndex = themeOptions.indexOf(themeMode)
+            ButtonGroup(
+                overflowIndicator = {},
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                themeOptions.forEachIndexed { index, mode ->
+                    val label = when (mode) {
+                        ThemeMode.SYSTEM -> "System"
+                        ThemeMode.LIGHT -> "Light"
+                        ThemeMode.DARK -> "Dark"
+                    }
+                    toggleableItem(
+                        /* checked =          */ index == selectedIndex,
+                        /* label =            */ label,
+                        /* onCheckedChange =  */ { checked ->
+                            if (checked) {
+                                haptics.tick()
+                                onThemeChange(mode)
+                            }
                         },
-                        selected = themeMode == mode,
-                        onClick = {
-                            haptics.tick()
-                            onThemeChange(mode)
-                        },
+                        /* icon/content =     */ { Text(text = label) },
+                        /* weight =           */ 1f,
                     )
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(16.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Spacer(Modifier.height(12.dp))
 
@@ -104,7 +114,6 @@ fun SettingsSheet(
     }
 }
 
-// Prefer ContextClick (a soft click) if available — falls back to LongPress on old APIs.
 private fun HapticFeedback.tick() {
     performHapticFeedback(HapticFeedbackType.ContextClick)
 }
@@ -117,37 +126,6 @@ private fun SectionLabel(label: String) {
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(bottom = 8.dp),
     )
-}
-
-@Composable
-private fun ThemeRadioRow(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    Surface(
-        color = if (selected) MaterialTheme.colorScheme.secondaryContainer
-                else MaterialTheme.colorScheme.surfaceContainerLow,
-        shape = RoundedCornerShape(20.dp),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
-            .clickable(onClick = onClick),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            RadioButton(selected = selected, onClick = onClick)
-            Spacer(Modifier.padding(horizontal = 4.dp))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.bodyLarge,
-            )
-        }
-    }
 }
 
 @Composable
