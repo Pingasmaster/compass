@@ -2,8 +2,10 @@
 agp = "9.2.0-alpha07"
 kotlin-compose = "2.3.20"
 
+# The Compose BOM pins every androidx.compose.* artefact. The explicit
+# `compose` version was removed — let the BOM be the single source of truth
+# so runtime/ui/foundation/animation don't drift.
 compose-bom = "2026.03.01"
-compose = "1.11.0-rc01"
 material3 = "1.5.0-alpha17"
 material3-adaptive = "1.2.0"
 graphics-shapes = "1.0.1"
@@ -19,13 +21,13 @@ junit = "4.13.2"
 
 [libraries]
 compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "compose-bom" }
-compose-runtime = { group = "androidx.compose.runtime", name = "runtime", version.ref = "compose" }
-compose-ui = { group = "androidx.compose.ui", name = "ui", version.ref = "compose" }
-compose-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics", version.ref = "compose" }
-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview", version.ref = "compose" }
-compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling", version.ref = "compose" }
-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "compose" }
-compose-animation = { group = "androidx.compose.animation", name = "animation", version.ref = "compose" }
+compose-runtime = { group = "androidx.compose.runtime", name = "runtime" }
+compose-ui = { group = "androidx.compose.ui", name = "ui" }
+compose-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
+compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
+compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
+compose-foundation = { group = "androidx.compose.foundation", name = "foundation" }
+compose-animation = { group = "androidx.compose.animation", name = "animation" }
 
 material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3" }
 material3-adaptive = { group = "androidx.compose.material3.adaptive", name = "adaptive", version.ref = "material3-adaptive" }

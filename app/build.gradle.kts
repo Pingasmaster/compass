@@ -23,6 +23,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // WARNING: release APK is signed with the debug keystore for local
+            // iteration convenience. Wire a real signingConfig before Play
+            // distribution (env-var-backed keystore, or Play App Signing).
             signingConfig = signingConfigs.getByName("debug")
         }
     }
@@ -40,6 +43,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = false
     }
 }
 
