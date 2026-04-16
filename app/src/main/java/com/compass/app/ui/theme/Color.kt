@@ -82,6 +82,9 @@ val md_dark_inversePrimary = Color(0xFF006879)
 val md_dark_surfaceTint = Color(0xFF58D5EE)
 val md_dark_scrim = Color(0xFF000000)
 
+// Override only accent seeds (primary/secondary/tertiary/error); let the
+// generated expressive scheme provide background / surface / surfaceContainer*
+// so the tonal ramp stays internally consistent.
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 val LightColorScheme = expressiveLightColorScheme().copy(
     primary = md_light_primary,
@@ -100,19 +103,6 @@ val LightColorScheme = expressiveLightColorScheme().copy(
     onError = md_light_onError,
     errorContainer = md_light_errorContainer,
     onErrorContainer = md_light_onErrorContainer,
-    background = md_light_background,
-    onBackground = md_light_onBackground,
-    surface = md_light_surface,
-    onSurface = md_light_onSurface,
-    surfaceVariant = md_light_surfaceVariant,
-    onSurfaceVariant = md_light_onSurfaceVariant,
-    outline = md_light_outline,
-    outlineVariant = md_light_outlineVariant,
-    inverseSurface = md_light_inverseSurface,
-    inverseOnSurface = md_light_inverseOnSurface,
-    inversePrimary = md_light_inversePrimary,
-    surfaceTint = md_light_surfaceTint,
-    scrim = md_light_scrim,
 )
 
 val DarkColorScheme = darkColorScheme(

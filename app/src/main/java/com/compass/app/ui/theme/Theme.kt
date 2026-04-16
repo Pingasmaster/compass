@@ -1,6 +1,5 @@
 package com.compass.app.ui.theme
 
-import android.app.Activity
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -12,20 +11,30 @@ import androidx.compose.material3.Shapes
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
-import androidx.core.view.WindowCompat
 
+/**
+ * Compass theme.
+ *
+ * - Dynamic color on API 31+ (the compass app's minSdk), with the seeded
+ *   fallback scheme when dynamic is disabled.
+ * - Colours animate on theme/scheme change with a two-speed spec:
+ *   accent slots fade fast, surface/background slots fade slowly so a
+ *   light ↔ dark flip doesn't flash.
+ * - OLED-black variant blends existing surfaces toward pure black so the
+ *   underlying seed/dynamic hue isn't lost.
+ * - [motionScheme] is overridable in case a caller wants to A/B a different
+ *   spec (e.g. `MotionScheme.standard()`).
+ */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun CompassTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = true,
     oledBlack: Boolean = false,
+    motionScheme: MotionScheme = MotionScheme.expressive(),
     content: @Composable () -> Unit,
 ) {
     val colorScheme = when {
@@ -38,35 +47,16 @@ fun CompassTheme(
     }
 
     val finalColorScheme = if (oledBlack && darkTheme) {
-        colorScheme.copy(
-            background = Color.Black,
-            surface = Color.Black,
-            surfaceDim = Color.Black,
-            surfaceBright = Color(0xFF0A0A0A),
-            surfaceContainerLowest = Color.Black,
-            surfaceContainerLow = Color(0xFF050505),
-            surfaceContainer = Color(0xFF0A0A0A),
-            surfaceContainerHigh = Color(0xFF1A1A1A),
-            surfaceContainerHighest = Color(0xFF2A2A2A),
-        )
+        colorScheme.toOledBlack()
     } else {
         colorScheme
     }
 
-    val motionScheme = MotionScheme.expressive()
-    val colorAnimSpec = remember(motionScheme) { motionScheme.fastEffectsSpec<Color>() }
-
-    val view = LocalView.current
-    if (!view.isInEditMode) {
-        SideEffect {
-            val window = (view.context as Activity).window
-            window.decorView.setBackgroundColor(finalColorScheme.surface.toArgb())
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
-        }
-    }
+    val accentSpec = remember(motionScheme) { motionScheme.fastEffectsSpec<Color>() }
+    val surfaceSpec = remember(motionScheme) { motionScheme.slowEffectsSpec<Color>() }
 
     MaterialExpressiveTheme(
-        colorScheme = finalColorScheme.animated(colorAnimSpec),
+        colorScheme = finalColorScheme.animated(accentSpec = accentSpec, surfaceSpec = surfaceSpec),
         typography = CompassTypography,
         motionScheme = motionScheme,
         shapes = Shapes(),
@@ -74,44 +64,68 @@ fun CompassTheme(
     )
 }
 
+/**
+ * Push each surface slot a fixed percentage toward black so dynamic-colour
+ * tinting survives the "OLED dark" preference instead of being replaced by
+ * neutral greys.
+ */
+private fun ColorScheme.toOledBlack(): ColorScheme = copy(
+    background = Color.Black,
+    surface = Color.Black,
+    surfaceDim = Color.Black,
+    surfaceBright = surfaceBright.lerpToBlack(0.92f),
+    surfaceContainerLowest = Color.Black,
+    surfaceContainerLow = surfaceContainerLow.lerpToBlack(0.95f),
+    surfaceContainer = surfaceContainer.lerpToBlack(0.90f),
+    surfaceContainerHigh = surfaceContainerHigh.lerpToBlack(0.80f),
+    surfaceContainerHighest = surfaceContainerHighest.lerpToBlack(0.70f),
+)
+
+private fun Color.lerpToBlack(amount: Float): Color =
+    androidx.compose.ui.graphics.lerp(this, Color.Black, amount.coerceIn(0f, 1f))
+
 @Composable
-private fun ColorScheme.animated(spec: AnimationSpec<Color>): ColorScheme {
+private fun ColorScheme.animated(
+    accentSpec: AnimationSpec<Color>,
+    surfaceSpec: AnimationSpec<Color>,
+): ColorScheme {
     return copy(
-        primary = animateColorAsState(primary, spec).value,
-        onPrimary = animateColorAsState(onPrimary, spec).value,
-        primaryContainer = animateColorAsState(primaryContainer, spec).value,
-        onPrimaryContainer = animateColorAsState(onPrimaryContainer, spec).value,
-        inversePrimary = animateColorAsState(inversePrimary, spec).value,
-        secondary = animateColorAsState(secondary, spec).value,
-        onSecondary = animateColorAsState(onSecondary, spec).value,
-        secondaryContainer = animateColorAsState(secondaryContainer, spec).value,
-        onSecondaryContainer = animateColorAsState(onSecondaryContainer, spec).value,
-        tertiary = animateColorAsState(tertiary, spec).value,
-        onTertiary = animateColorAsState(onTertiary, spec).value,
-        tertiaryContainer = animateColorAsState(tertiaryContainer, spec).value,
-        onTertiaryContainer = animateColorAsState(onTertiaryContainer, spec).value,
-        background = animateColorAsState(background, spec).value,
-        onBackground = animateColorAsState(onBackground, spec).value,
-        surface = animateColorAsState(surface, spec).value,
-        onSurface = animateColorAsState(onSurface, spec).value,
-        surfaceVariant = animateColorAsState(surfaceVariant, spec).value,
-        onSurfaceVariant = animateColorAsState(onSurfaceVariant, spec).value,
-        surfaceTint = animateColorAsState(surfaceTint, spec).value,
-        inverseSurface = animateColorAsState(inverseSurface, spec).value,
-        inverseOnSurface = animateColorAsState(inverseOnSurface, spec).value,
-        error = animateColorAsState(error, spec).value,
-        onError = animateColorAsState(onError, spec).value,
-        errorContainer = animateColorAsState(errorContainer, spec).value,
-        onErrorContainer = animateColorAsState(onErrorContainer, spec).value,
-        outline = animateColorAsState(outline, spec).value,
-        outlineVariant = animateColorAsState(outlineVariant, spec).value,
-        scrim = animateColorAsState(scrim, spec).value,
-        surfaceBright = animateColorAsState(surfaceBright, spec).value,
-        surfaceDim = animateColorAsState(surfaceDim, spec).value,
-        surfaceContainer = animateColorAsState(surfaceContainer, spec).value,
-        surfaceContainerHigh = animateColorAsState(surfaceContainerHigh, spec).value,
-        surfaceContainerHighest = animateColorAsState(surfaceContainerHighest, spec).value,
-        surfaceContainerLow = animateColorAsState(surfaceContainerLow, spec).value,
-        surfaceContainerLowest = animateColorAsState(surfaceContainerLowest, spec).value,
+        primary = animateColorAsState(primary, accentSpec).value,
+        onPrimary = animateColorAsState(onPrimary, accentSpec).value,
+        primaryContainer = animateColorAsState(primaryContainer, accentSpec).value,
+        onPrimaryContainer = animateColorAsState(onPrimaryContainer, accentSpec).value,
+        inversePrimary = animateColorAsState(inversePrimary, accentSpec).value,
+        secondary = animateColorAsState(secondary, accentSpec).value,
+        onSecondary = animateColorAsState(onSecondary, accentSpec).value,
+        secondaryContainer = animateColorAsState(secondaryContainer, accentSpec).value,
+        onSecondaryContainer = animateColorAsState(onSecondaryContainer, accentSpec).value,
+        tertiary = animateColorAsState(tertiary, accentSpec).value,
+        onTertiary = animateColorAsState(onTertiary, accentSpec).value,
+        tertiaryContainer = animateColorAsState(tertiaryContainer, accentSpec).value,
+        onTertiaryContainer = animateColorAsState(onTertiaryContainer, accentSpec).value,
+        // Background / surface slots use the slow spec to avoid theme-flip flash.
+        background = animateColorAsState(background, surfaceSpec).value,
+        onBackground = animateColorAsState(onBackground, surfaceSpec).value,
+        surface = animateColorAsState(surface, surfaceSpec).value,
+        onSurface = animateColorAsState(onSurface, surfaceSpec).value,
+        surfaceVariant = animateColorAsState(surfaceVariant, surfaceSpec).value,
+        onSurfaceVariant = animateColorAsState(onSurfaceVariant, surfaceSpec).value,
+        surfaceTint = animateColorAsState(surfaceTint, surfaceSpec).value,
+        inverseSurface = animateColorAsState(inverseSurface, surfaceSpec).value,
+        inverseOnSurface = animateColorAsState(inverseOnSurface, surfaceSpec).value,
+        error = animateColorAsState(error, accentSpec).value,
+        onError = animateColorAsState(onError, accentSpec).value,
+        errorContainer = animateColorAsState(errorContainer, accentSpec).value,
+        onErrorContainer = animateColorAsState(onErrorContainer, accentSpec).value,
+        outline = animateColorAsState(outline, surfaceSpec).value,
+        outlineVariant = animateColorAsState(outlineVariant, surfaceSpec).value,
+        scrim = animateColorAsState(scrim, surfaceSpec).value,
+        surfaceBright = animateColorAsState(surfaceBright, surfaceSpec).value,
+        surfaceDim = animateColorAsState(surfaceDim, surfaceSpec).value,
+        surfaceContainer = animateColorAsState(surfaceContainer, surfaceSpec).value,
+        surfaceContainerHigh = animateColorAsState(surfaceContainerHigh, surfaceSpec).value,
+        surfaceContainerHighest = animateColorAsState(surfaceContainerHighest, surfaceSpec).value,
+        surfaceContainerLow = animateColorAsState(surfaceContainerLow, surfaceSpec).value,
+        surfaceContainerLowest = animateColorAsState(surfaceContainerLowest, surfaceSpec).value,
     )
 }
