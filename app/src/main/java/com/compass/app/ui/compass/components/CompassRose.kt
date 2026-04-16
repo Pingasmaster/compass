@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.ui.Modifier
@@ -60,11 +61,14 @@ fun CompassRose(
 ) {
     val cumulativeAngle = remember { Animatable(0f) }
     val animSpec: AnimationSpec<Float> = remember(responsiveness) { responsiveness.toSpringSpec() }
-    // Drive the animation from a snapshotFlow instead of keying LaunchedEffect on the
-    // rapidly-changing Float — avoids re-launching the coroutine on every sensor tick
-    // and lets Animatable retarget smoothly without allocating new Jobs.
+    // rememberUpdatedState wraps the incoming Float param in a State<Float> that updates
+    // on every recomposition. snapshotFlow reads from that State, so changes to
+    // azimuthDegrees actually propagate to the coroutine — without a bare
+    // `snapshotFlow { azimuthDegrees }` on a non-state Float, which would capture the
+    // value once and never re-emit.
+    val latestAzimuth by rememberUpdatedState(azimuthDegrees)
     LaunchedEffect(Unit) {
-        snapshotFlow { azimuthDegrees }
+        snapshotFlow { latestAzimuth }
             .collectLatest { target ->
                 cumulativeAngle.animateTo(
                     targetValue = unwrapAngle(cumulativeAngle.value, -target),
