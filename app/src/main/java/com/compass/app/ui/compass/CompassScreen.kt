@@ -25,8 +25,9 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.PressInteraction
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.GpsFixed
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Button
@@ -34,15 +35,14 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.IconButtonShapes
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -53,6 +53,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
@@ -65,10 +66,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -117,10 +122,6 @@ fun CompassScreen(
 
     Scaffold(
         topBar = {
-            // Regular (small) TopAppBar keeps title + actions on the same baseline.
-            // The subtitle slot (second overload) places the AccuracyChip under the
-            // title on the left, still within the single-row layout — visually the
-            // actions on the right stay level with the title text.
             TopAppBar(
                 title = { Text(stringResource(R.string.title_compass)) },
                 subtitle = {
@@ -130,31 +131,24 @@ fun CompassScreen(
                     )
                 },
                 actions = {
-                    TopBarActions(
-                        targetActive = targetAngle != null,
-                        onTarget = { showTargetDialog = true },
-                        onSettings = { showSettings = true },
-                    )
+                    TopBarActions(onSettings = { showSettings = true })
                 },
             )
         },
         floatingActionButton = {
-            AnimatedVisibility(
-                visible = targetAngle != null,
-                enter = scaleIn() + fadeIn(),
-                exit = scaleOut() + fadeOut(),
+            val targetActive = targetAngle != null
+            FloatingActionButton(
+                onClick = { showTargetDialog = true },
+                containerColor = if (targetActive) MaterialTheme.colorScheme.tertiaryContainer
+                    else MaterialTheme.colorScheme.primaryContainer,
+                contentColor = if (targetActive) MaterialTheme.colorScheme.onTertiaryContainer
+                    else MaterialTheme.colorScheme.onPrimaryContainer,
+                shape = FloatingActionButtonDefaults.shape,
             ) {
-                FloatingActionButton(
-                    onClick = { viewModel.setTargetAngle(null) },
-                    containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
-                    shape = FloatingActionButtonDefaults.shape,
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Close,
-                        contentDescription = stringResource(R.string.target_sheet_clear),
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Rounded.GpsFixed,
+                    contentDescription = stringResource(R.string.action_set_target_angle),
+                )
             }
         },
     ) { innerPadding ->
@@ -254,33 +248,7 @@ fun CompassScreen(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun TopBarActions(
-    targetActive: Boolean,
-    onTarget: () -> Unit,
-    onSettings: () -> Unit,
-) {
-    // Two large (56dp) icon buttons grouped in a Row inside the TopAppBar's actions
-    // slot. Large round/pressed shapes give the full M3E shape-morph on press.
-    FilledTonalIconButton(
-        onClick = onTarget,
-        shapes = IconButtonShapes(
-            shape = IconButtonDefaults.largeRoundShape,
-            pressedShape = IconButtonDefaults.largePressedShape,
-        ),
-        colors = IconButtonDefaults.filledTonalIconButtonColors(
-            containerColor = if (targetActive) MaterialTheme.colorScheme.tertiaryContainer
-                else MaterialTheme.colorScheme.surfaceContainerHigh,
-            contentColor = if (targetActive) MaterialTheme.colorScheme.onTertiaryContainer
-                else MaterialTheme.colorScheme.onSurfaceVariant,
-        ),
-        modifier = Modifier.size(56.dp),
-    ) {
-        Icon(
-            imageVector = Icons.Rounded.GpsFixed,
-            contentDescription = stringResource(R.string.action_set_target_angle),
-        )
-    }
-    Spacer(Modifier.width(8.dp))
+private fun TopBarActions(onSettings: () -> Unit) {
     FilledIconButton(
         onClick = onSettings,
         shapes = IconButtonShapes(
@@ -358,7 +326,43 @@ private fun TargetAngleSheet(
                 )
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(12.dp))
+
+            // Numpad text entry — lets the user type an exact bearing. Bidirectional
+            // with the slider; the field only drives the slider while focused, and
+            // the slider only drives the field while the field is unfocused.
+            val focusManager = LocalFocusManager.current
+            val sliderValueInt by remember {
+                derivedStateOf { sliderState.value.toInt() }
+            }
+            var fieldFocused by remember { mutableStateOf(false) }
+            var fieldText by remember { mutableStateOf(sliderValueInt.toString()) }
+            LaunchedEffect(sliderValueInt) {
+                if (!fieldFocused) fieldText = sliderValueInt.toString()
+            }
+            OutlinedTextField(
+                value = fieldText,
+                onValueChange = { raw ->
+                    val digits = raw.filter { it.isDigit() }.take(3)
+                    fieldText = digits
+                    digits.toIntOrNull()?.let { v ->
+                        if (v in 0..360) sliderState.value = v.toFloat()
+                    }
+                },
+                singleLine = true,
+                label = { Text(stringResource(R.string.target_sheet_field_label)) },
+                suffix = { Text("°", style = MaterialTheme.typography.titleLarge) },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = KeyboardType.Number,
+                    imeAction = ImeAction.Done,
+                ),
+                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .onFocusChanged { fieldFocused = it.isFocused },
+            )
+
+            Spacer(Modifier.height(12.dp))
 
             // Slider with a built-in M3 PlainTooltip above the thumb for the value
             // indicator — fires on drag/press via the interactionSource.
