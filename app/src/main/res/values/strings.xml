@@ -1,3 +1,53 @@
 <resources>
     <string name="app_name">Compass</string>
+
+    <!-- Top bar -->
+    <string name="title_compass">Compass</string>
+    <string name="action_set_target_angle">Set target angle</string>
+    <string name="action_settings">Settings</string>
+
+    <!-- Compass rose accessibility -->
+    <string name="rose_content_description">Heading %1$d degrees, %2$s</string>
+
+    <!-- Heading readout -->
+    <string name="magnetic_north">Magnetic north</string>
+    <string name="true_north_declination">True north · declination %1$s°</string>
+    <string name="target_prefix">Target %1$d° · %2$s</string>
+
+    <!-- Accuracy chip / calibration -->
+    <string name="accuracy_no_sensor">No sensor</string>
+    <string name="accuracy_high">High accuracy</string>
+    <string name="accuracy_medium">Medium accuracy</string>
+    <string name="accuracy_low">Low accuracy</string>
+    <string name="accuracy_unreliable">Unreliable</string>
+    <string name="accuracy_unknown">Calibrating…</string>
+    <string name="calibration_banner_title">Calibration needed</string>
+    <string name="calibration_banner_body">Move your phone in a figure-8 a few times.</string>
+
+    <!-- Settings sheet -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_theme_label">Theme</string>
+    <string name="settings_theme_system">System</string>
+    <string name="settings_theme_light">Light</string>
+    <string name="settings_theme_dark">Dark</string>
+    <string name="settings_responsiveness_label">Rose responsiveness</string>
+    <string name="settings_responsiveness_slowest">Slowest</string>
+    <string name="settings_responsiveness_slow">Slow</string>
+    <string name="settings_responsiveness_normal">Normal</string>
+    <string name="settings_responsiveness_fast">Fast</string>
+    <string name="settings_responsiveness_fastest">Fastest</string>
+    <string name="settings_dynamic_color">Dynamic color</string>
+    <string name="settings_dynamic_color_desc">Follow system wallpaper colors</string>
+    <string name="settings_oled_dark">OLED dark theme</string>
+    <string name="settings_oled_dark_desc">Pure black background in dark mode</string>
+    <string name="settings_true_north">True north</string>
+    <string name="settings_true_north_desc">Correct heading with local magnetic declination</string>
+
+    <!-- Target angle sheet -->
+    <string name="target_sheet_title">Target bearing</string>
+    <string name="target_sheet_body">Drag the slider to set a heading you want to reach. The rose will show a coloured line at that bearing and the degree number tints to match within ±10°.</string>
+    <string name="target_sheet_clear">Clear</string>
+    <string name="target_sheet_cancel">Cancel</string>
+    <string name="target_sheet_set">Set</string>
+    <string name="target_sheet_value_label">%1$d°</string>
 </resources>

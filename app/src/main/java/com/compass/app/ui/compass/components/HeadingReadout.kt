@@ -25,8 +25,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import com.compass.app.R
 import com.compass.app.domain.model.toCardinal
 import com.compass.app.domain.sensor.unwrapAngle
 import com.compass.app.ui.theme.headingDegrees
@@ -121,13 +123,13 @@ fun HeadingReadout(
         }
 
         val baseSubtitle = if (isTrueNorth) {
-            "True north · declination ${"%+.1f".format(declination)}°"
+            stringResource(R.string.true_north_declination, "%+.1f".format(declination))
         } else {
-            "Magnetic north"
+            stringResource(R.string.magnetic_north)
         }
         val subtitle = if (targetAngle != null) {
             val normalisedTarget = ((targetAngle.toInt() % 360) + 360) % 360
-            "Target ${normalisedTarget}° · $baseSubtitle"
+            stringResource(R.string.target_prefix, normalisedTarget, baseSubtitle)
         } else {
             baseSubtitle
         }
