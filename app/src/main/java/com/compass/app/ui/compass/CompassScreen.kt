@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.GpsFixed
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledIconButton
@@ -268,7 +269,7 @@ private fun TopBar(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun TargetAngleSheet(
     currentTarget: Float?,
@@ -283,7 +284,7 @@ private fun TargetAngleSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        // Inherit the Expressive sheet shape token instead of hard-coding 28dp.
     ) {
         Column(
             modifier = Modifier
@@ -416,17 +417,22 @@ private fun TargetAngleSheet(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
             ) {
-                TextButton(onClick = {
-                    onConfirm(null)
-                }) { Text(stringResource(R.string.target_sheet_clear)) }
+                // Use the no-arg ButtonDefaults.shapes() — gives the M3 Expressive
+                // round-to-square press morph for free.
+                TextButton(
+                    shapes = ButtonDefaults.shapes(),
+                    onClick = { onConfirm(null) },
+                ) { Text(stringResource(R.string.target_sheet_clear)) }
                 Spacer(Modifier.width(8.dp))
-                TextButton(onClick = onDismiss) {
-                    Text(stringResource(R.string.target_sheet_cancel))
-                }
+                TextButton(
+                    shapes = ButtonDefaults.shapes(),
+                    onClick = onDismiss,
+                ) { Text(stringResource(R.string.target_sheet_cancel)) }
                 Spacer(Modifier.width(8.dp))
-                Button(onClick = {
-                    onConfirm(((bearing % 360f) + 360f) % 360f)
-                }) { Text(stringResource(R.string.target_sheet_set)) }
+                Button(
+                    shapes = ButtonDefaults.shapes(),
+                    onClick = { onConfirm(((bearing % 360f) + 360f) % 360f) },
+                ) { Text(stringResource(R.string.target_sheet_set)) }
             }
 
             Spacer(Modifier.height(16.dp))
