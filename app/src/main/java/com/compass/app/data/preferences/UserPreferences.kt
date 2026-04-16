@@ -12,11 +12,14 @@ private val Context.dataStore by preferencesDataStore(name = "compass_prefs")
 
 enum class ThemeMode { SYSTEM, LIGHT, DARK }
 
+enum class Responsiveness { SLOWEST, SLOW, NORMAL, FAST, FASTEST }
+
 class UserPreferences(private val context: Context) {
     private val THEME_MODE_KEY = stringPreferencesKey("theme_mode")
     private val DYNAMIC_COLOR_KEY = booleanPreferencesKey("dynamic_color")
     private val OLED_BLACK_KEY = booleanPreferencesKey("oled_black")
     private val TRUE_NORTH_KEY = booleanPreferencesKey("true_north")
+    private val RESPONSIVENESS_KEY = stringPreferencesKey("responsiveness")
 
     val themeMode: Flow<ThemeMode> =
         context.dataStore.data.map {
@@ -35,6 +38,29 @@ class UserPreferences(private val context: Context) {
 
     val trueNorthEnabled: Flow<Boolean> =
         context.dataStore.data.map { it[TRUE_NORTH_KEY] ?: false }
+
+    val responsiveness: Flow<Responsiveness> =
+        context.dataStore.data.map {
+            when (it[RESPONSIVENESS_KEY]) {
+                "slowest" -> Responsiveness.SLOWEST
+                "slow" -> Responsiveness.SLOW
+                "fast" -> Responsiveness.FAST
+                "fastest" -> Responsiveness.FASTEST
+                else -> Responsiveness.NORMAL
+            }
+        }
+
+    suspend fun setResponsiveness(mode: Responsiveness) {
+        context.dataStore.edit {
+            it[RESPONSIVENESS_KEY] = when (mode) {
+                Responsiveness.SLOWEST -> "slowest"
+                Responsiveness.SLOW -> "slow"
+                Responsiveness.NORMAL -> "normal"
+                Responsiveness.FAST -> "fast"
+                Responsiveness.FASTEST -> "fastest"
+            }
+        }
+    }
 
     suspend fun setThemeMode(mode: ThemeMode) {
         context.dataStore.edit {

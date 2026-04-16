@@ -1,6 +1,7 @@
 package com.compass.app.ui.compass.components
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
@@ -31,6 +32,7 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.compass.app.data.preferences.Responsiveness
 import com.compass.app.domain.sensor.unwrapAngle
 import com.compass.app.ui.theme.NorthRed
 import com.compass.app.ui.theme.NorthRedDark
@@ -51,17 +53,16 @@ fun CompassRose(
     isDark: Boolean,
     calibrating: Boolean = false,
     targetAngle: Float? = null,
-    onTargetHitColor: Color = Color(0xFF2EB872),
+    targetColor: Color = MaterialTheme.colorScheme.tertiary,
+    responsiveness: Responsiveness = Responsiveness.NORMAL,
 ) {
     val cumulativeAngle = remember { Animatable(0f) }
+    val animSpec: AnimationSpec<Float> = responsiveness.toSpringSpec()
     LaunchedEffect(azimuthDegrees) {
         val target = unwrapAngle(cumulativeAngle.value, -azimuthDegrees)
         cumulativeAngle.animateTo(
             targetValue = target,
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioLowBouncy,
-                stiffness = Spring.StiffnessLow,
-            ),
+            animationSpec = animSpec,
         )
     }
 
@@ -149,7 +150,7 @@ fun CompassRose(
                         centerY = cy,
                         radius = roseRadius * 0.90f,
                         angleDeg = targetAngle,
-                        color = onTargetHitColor,
+                        color = targetColor,
                     )
                 }
             }
@@ -183,6 +184,29 @@ fun CompassRose(
     }
 }
 
+
+private fun Responsiveness.toSpringSpec(): AnimationSpec<Float> = when (this) {
+    Responsiveness.SLOWEST -> spring(
+        dampingRatio = Spring.DampingRatioLowBouncy,
+        stiffness = 30f,
+    )
+    Responsiveness.SLOW -> spring(
+        dampingRatio = Spring.DampingRatioLowBouncy,
+        stiffness = 80f,
+    )
+    Responsiveness.NORMAL -> spring(
+        dampingRatio = Spring.DampingRatioLowBouncy,
+        stiffness = Spring.StiffnessLow,
+    )
+    Responsiveness.FAST -> spring(
+        dampingRatio = Spring.DampingRatioMediumBouncy,
+        stiffness = Spring.StiffnessMediumLow,
+    )
+    Responsiveness.FASTEST -> spring(
+        dampingRatio = Spring.DampingRatioNoBouncy,
+        stiffness = Spring.StiffnessMedium,
+    )
+}
 
 private fun DrawScope.drawTargetLine(
     centerX: Float,

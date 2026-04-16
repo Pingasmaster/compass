@@ -39,7 +39,7 @@ fun HeadingReadout(
     declination: Float,
     modifier: Modifier = Modifier,
     targetAngle: Float? = null,
-    targetHitColor: Color = Color(0xFF2EB872),
+    targetHitColor: Color = MaterialTheme.colorScheme.tertiary,
 ) {
     // Unwrap to a cumulative angle so animateFloatAsState takes the shortest path
     // across the 0°/360° seam; then normalise back to [0,360) for display.
