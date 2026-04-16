@@ -280,7 +280,6 @@ private fun TargetAngleSheet(
     val sliderState = remember {
         SliderState(
             value = currentTarget?.coerceIn(0f, 360f) ?: 0f,
-            steps = 7,
             valueRange = 0f..360f,
         )
     }
