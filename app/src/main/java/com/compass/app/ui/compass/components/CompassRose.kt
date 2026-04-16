@@ -74,11 +74,14 @@ fun CompassRose(
         )
     }
 
-    // Morph the outer cookie toward a "flower" shape during calibration for an
-    // unmistakably-expressive visual cue.
-    val morph = remember {
-        Morph(start = MaterialShapes.Cookie12Sided, end = MaterialShapes.Flower)
-    }
+    // Morph between two truly-wavy M3 Expressive presets for the calibration cue
+    // (Puffy ↔ SoftBurst — both have soft round bumps, never spiky petals, so the
+    // shape always reads as a wavy RING around the inner rose, not as spikes).
+    // Both shapes are `.normalized()` so bounds are (0,0)-(1,1), which lets
+    // `polygonPathCentered` scale them to a consistent size.
+    val baseShape = remember { MaterialShapes.Puffy.normalized() }
+    val calibrationEnd = remember { MaterialShapes.SoftBurst.normalized() }
+    val morph = remember { Morph(start = baseShape, end = calibrationEnd) }
     val morphTransition = rememberInfiniteTransition(label = "calibrationMorph")
     val morphProgress by morphTransition.animateFloat(
         initialValue = 0f,
@@ -104,8 +107,6 @@ fun CompassRose(
     val intercardinalStyle = MaterialTheme.typography.labelLarge
     val textMeasurer = rememberTextMeasurer()
 
-    // M3 Expressive preset: 12-sided rounded cookie.
-    val cookie = MaterialShapes.Cookie12Sided
 
     Box(modifier = modifier) {
         Canvas(modifier = Modifier.fillMaxSize()) {
@@ -116,11 +117,11 @@ fun CompassRose(
             // Outer cookie now fills the canvas fully (minus a 2dp stroke margin).
             val outerRadius = minOf(w, h) / 2f - 2.dp.toPx()
 
-            // Expressive background disc: interpolate Cookie ↔ Flower when calibrating.
+            // Expressive wavy background: Puffy (resting) ↔ SoftBurst (calibrating).
             val discPath = if (calibrating) {
-                morphPath(morph, morphProgress, cx, cy, outerRadius, cumulativeAngle.value)
+                morphPathCentered(morph, morphProgress, cx, cy, outerRadius, cumulativeAngle.value)
             } else {
-                roundedPolygonPath(cookie, cx, cy, outerRadius, cumulativeAngle.value)
+                polygonPathCentered(baseShape, cx, cy, outerRadius, cumulativeAngle.value)
             }
             drawPath(path = discPath, color = surfaceContainerHigh)
             drawPath(
@@ -129,8 +130,9 @@ fun CompassRose(
                 style = Stroke(width = 2.dp.toPx()),
             )
 
-            // Inner rose disc — clearly smaller so the cookie ring is visible all around.
-            val innerRadius = outerRadius * 0.62f
+            // Inner rose disc — well under the shape's minimum concave dip so the
+            // wavy ring is clearly visible all around, not just at the bumps.
+            val innerRadius = outerRadius * 0.55f
             drawCircle(
                 color = surfaceContainer,
                 radius = innerRadius,
@@ -200,16 +202,32 @@ fun CompassRose(
     }
 }
 
-private fun roundedPolygonPath(
+/**
+ * Center-and-scale a [RoundedPolygon] so that its tightest bounds are sized to fit
+ * within a square of side `2 * radius` centered at `(cx, cy)`. Mirrors the Androidify
+ * reference pattern for decorative MaterialShapes backdrops.
+ */
+private fun polygonPathCentered(
     polygon: RoundedPolygon,
     cx: Float,
     cy: Float,
     radius: Float,
     rotationDeg: Float,
 ): ComposePath {
+    val bounds = polygon.calculateMaxBounds(FloatArray(4))
+    // bounds layout: [minX, minY, maxX, maxY]
+    val shapeCenterX = (bounds[0] + bounds[2]) / 2f
+    val shapeCenterY = (bounds[1] + bounds[3]) / 2f
+    val shapeHalfExtent = maxOf(
+        (bounds[2] - bounds[0]) / 2f,
+        (bounds[3] - bounds[1]) / 2f,
+    ).coerceAtLeast(1e-4f)
+    val scale = radius / shapeHalfExtent
+
     val androidPath = polygon.toPath(AndroidPath())
     val matrix = AndroidMatrix().apply {
-        postScale(radius, radius)
+        postTranslate(-shapeCenterX, -shapeCenterY)
+        postScale(scale, scale)
         postRotate(rotationDeg)
         postTranslate(cx, cy)
     }
@@ -217,7 +235,12 @@ private fun roundedPolygonPath(
     return androidPath.asComposePath()
 }
 
-private fun morphPath(
+/**
+ * Same centering behaviour for a [Morph]. The morph is assumed to have been built from
+ * two already-`.normalized()` polygons, so its bounds are roughly `(0,0)-(1,1)` and we
+ * can center at `(0.5, 0.5)` and scale by `2 * radius`.
+ */
+private fun morphPathCentered(
     morph: Morph,
     progress: Float,
     cx: Float,
@@ -225,10 +248,10 @@ private fun morphPath(
     radius: Float,
     rotationDeg: Float,
 ): ComposePath {
-    // material3.toPath extension accepts a Morph + progress and emits a Compose Path.
     val composePath = morph.toPath(progress = progress, path = ComposePath())
     val matrix = AndroidMatrix().apply {
-        postScale(radius, radius)
+        postTranslate(-0.5f, -0.5f)
+        postScale(2f * radius, 2f * radius)
         postRotate(rotationDeg)
         postTranslate(cx, cy)
     }
