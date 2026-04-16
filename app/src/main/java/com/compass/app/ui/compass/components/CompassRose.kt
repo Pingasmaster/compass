@@ -1,7 +1,5 @@
 package com.compass.app.ui.compass.components
 
-import android.graphics.Matrix as AndroidMatrix
-import android.graphics.Path as AndroidPath
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -15,9 +13,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.toPath
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -26,8 +22,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.asAndroidPath
-import androidx.compose.ui.graphics.asComposePath
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
@@ -37,9 +31,6 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.graphics.shapes.Morph
-import androidx.graphics.shapes.RoundedPolygon
-import androidx.graphics.shapes.toPath
 import com.compass.app.domain.sensor.unwrapAngle
 import com.compass.app.ui.theme.NorthRed
 import com.compass.app.ui.theme.NorthRedDark
@@ -74,34 +65,27 @@ fun CompassRose(
         )
     }
 
-    // Morph between two truly-wavy M3 Expressive presets for the calibration cue
-    // (Puffy ↔ SoftBurst — both have soft round bumps, never spiky petals, so the
-    // shape always reads as a wavy RING around the inner rose, not as spikes).
-    // Both shapes are `.normalized()` so bounds are (0,0)-(1,1), which lets
-    // `polygonPathCentered` scale them to a consistent size.
-    val baseShape = remember { MaterialShapes.Puffy.normalized() }
-    val calibrationEnd = remember { MaterialShapes.SoftBurst.normalized() }
-    val morph = remember { Morph(start = baseShape, end = calibrationEnd) }
-    val morphTransition = rememberInfiniteTransition(label = "calibrationMorph")
-    val morphProgress by morphTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = if (calibrating) 1f else 0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1400, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "calibrationMorphProgress",
-    )
-
     val onSurface = MaterialTheme.colorScheme.onSurface
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
     val primary = MaterialTheme.colorScheme.primary
     val onPrimary = MaterialTheme.colorScheme.onPrimary
     val surfaceContainer = MaterialTheme.colorScheme.surfaceContainer
-    val surfaceContainerHigh = MaterialTheme.colorScheme.surfaceContainerHigh
-    val outline = MaterialTheme.colorScheme.outlineVariant
+    val outlineVariant = MaterialTheme.colorScheme.outlineVariant
+    val errorColor = MaterialTheme.colorScheme.error
     val needleNorth = if (isDark) NorthRedDark else NorthRed
     val needleSouth = MaterialTheme.colorScheme.surfaceContainerHighest
+
+    // Calibration cue: a subtle pulse on the rose disc itself — no extra backdrop shape.
+    val calibrationPulse = rememberInfiniteTransition(label = "calibrationPulse")
+    val calibrationAlpha by calibrationPulse.animateFloat(
+        initialValue = if (calibrating) 0.5f else 0f,
+        targetValue = if (calibrating) 1f else 0f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse,
+        ),
+        label = "calibrationPulseAlpha",
+    )
 
     val cardinalStyle = MaterialTheme.typography.headlineSmall
     val intercardinalStyle = MaterialTheme.typography.labelLarge
@@ -114,29 +98,26 @@ fun CompassRose(
             val h = size.height
             val cx = w / 2f
             val cy = h / 2f
-            // Outer cookie now fills the canvas fully (minus a 2dp stroke margin).
-            val outerRadius = minOf(w, h) / 2f - 2.dp.toPx()
+            // Rose fills the canvas; reserve a small margin for the fixed heading pointer.
+            val roseRadius = minOf(w, h) / 2f - 14.dp.toPx()
 
-            // Expressive wavy background: Puffy (resting) ↔ SoftBurst (calibrating).
-            val discPath = if (calibrating) {
-                morphPathCentered(morph, morphProgress, cx, cy, outerRadius, cumulativeAngle.value)
-            } else {
-                polygonPathCentered(baseShape, cx, cy, outerRadius, cumulativeAngle.value)
-            }
-            drawPath(path = discPath, color = surfaceContainerHigh)
-            drawPath(
-                path = discPath,
-                color = outline,
-                style = Stroke(width = 2.dp.toPx()),
-            )
-
-            // Inner rose disc — well under the shape's minimum concave dip so the
-            // wavy ring is clearly visible all around, not just at the bumps.
-            val innerRadius = outerRadius * 0.55f
+            // Rose base disc with a ring outline. When calibrating, the ring pulses
+            // toward the error colour — no extra backdrop shape.
             drawCircle(
                 color = surfaceContainer,
-                radius = innerRadius,
+                radius = roseRadius,
                 center = Offset(cx, cy),
+            )
+            val ringColor = if (calibrating) {
+                androidx.compose.ui.graphics.lerp(outlineVariant, errorColor, calibrationAlpha)
+            } else {
+                outlineVariant
+            }
+            drawCircle(
+                color = ringColor,
+                radius = roseRadius,
+                center = Offset(cx, cy),
+                style = Stroke(width = 2.dp.toPx()),
             )
 
             // Rotating rose: ticks + letters.
@@ -144,7 +125,7 @@ fun CompassRose(
                 drawTicks(
                     centerX = cx,
                     centerY = cy,
-                    outerRadius = innerRadius * 0.96f,
+                    outerRadius = roseRadius * 0.99f,
                     majorColor = onSurface,
                     minorColor = onSurfaceVariant,
                 )
@@ -152,7 +133,7 @@ fun CompassRose(
                     textMeasurer = textMeasurer,
                     centerX = cx,
                     centerY = cy,
-                    radius = innerRadius * 0.72f,
+                    radius = roseRadius * 0.82f,
                     cardinalStyle = cardinalStyle,
                     intercardinalStyle = intercardinalStyle,
                     northColor = needleNorth,
@@ -166,7 +147,7 @@ fun CompassRose(
                     drawTargetLine(
                         centerX = cx,
                         centerY = cy,
-                        radius = outerRadius * 0.98f,
+                        radius = roseRadius * 0.90f,
                         angleDeg = targetAngle,
                         color = onTargetHitColor,
                     )
@@ -174,8 +155,8 @@ fun CompassRose(
             }
 
             // Fixed needle.
-            val needleLen = innerRadius * 0.92f
-            val needleHalfWidth = outerRadius * 0.045f
+            val needleLen = roseRadius * 0.70f
+            val needleHalfWidth = roseRadius * 0.045f
             drawNeedle(
                 centerX = cx,
                 centerY = cy,
@@ -186,11 +167,11 @@ fun CompassRose(
             )
 
             // Hub.
-            drawCircle(color = primary, radius = outerRadius * 0.05f, center = Offset(cx, cy))
-            drawCircle(color = onPrimary, radius = outerRadius * 0.02f, center = Offset(cx, cy))
+            drawCircle(color = primary, radius = roseRadius * 0.045f, center = Offset(cx, cy))
+            drawCircle(color = onPrimary, radius = roseRadius * 0.018f, center = Offset(cx, cy))
 
-            // Fixed top indicator triangle (outside the cookie).
-            val tipY = cy - outerRadius - 6.dp.toPx()
+            // Fixed top indicator triangle (outside the rose, points at current heading).
+            val tipY = cy - roseRadius - 4.dp.toPx()
             val trianglePath = ComposePath().apply {
                 moveTo(cx, tipY - 10.dp.toPx())
                 lineTo(cx - 10.dp.toPx(), tipY + 8.dp.toPx())
@@ -202,65 +183,6 @@ fun CompassRose(
     }
 }
 
-/**
- * Center-and-scale a [RoundedPolygon] so that its tightest bounds are sized to fit
- * within a square of side `2 * radius` centered at `(cx, cy)`. Mirrors the Androidify
- * reference pattern for decorative MaterialShapes backdrops.
- */
-private fun polygonPathCentered(
-    polygon: RoundedPolygon,
-    cx: Float,
-    cy: Float,
-    radius: Float,
-    rotationDeg: Float,
-): ComposePath {
-    val bounds = polygon.calculateMaxBounds(FloatArray(4))
-    // bounds layout: [minX, minY, maxX, maxY]
-    val shapeCenterX = (bounds[0] + bounds[2]) / 2f
-    val shapeCenterY = (bounds[1] + bounds[3]) / 2f
-    val shapeHalfExtent = maxOf(
-        (bounds[2] - bounds[0]) / 2f,
-        (bounds[3] - bounds[1]) / 2f,
-    ).coerceAtLeast(1e-4f)
-    val scale = radius / shapeHalfExtent
-
-    val androidPath = polygon.toPath(AndroidPath())
-    val matrix = AndroidMatrix().apply {
-        postTranslate(-shapeCenterX, -shapeCenterY)
-        postScale(scale, scale)
-        postRotate(rotationDeg)
-        postTranslate(cx, cy)
-    }
-    androidPath.transform(matrix)
-    return androidPath.asComposePath()
-}
-
-/**
- * Same centering behaviour for a [Morph]. The morph is assumed to have been built from
- * two already-`.normalized()` polygons, so its bounds are roughly `(0,0)-(1,1)` and we
- * can center at `(0.5, 0.5)` and scale by `2 * radius`.
- */
-private fun morphPathCentered(
-    morph: Morph,
-    progress: Float,
-    cx: Float,
-    cy: Float,
-    radius: Float,
-    rotationDeg: Float,
-): ComposePath {
-    val composePath = morph.toPath(progress = progress, path = ComposePath())
-    val matrix = AndroidMatrix().apply {
-        postTranslate(-0.5f, -0.5f)
-        postScale(2f * radius, 2f * radius)
-        postRotate(rotationDeg)
-        postTranslate(cx, cy)
-    }
-    val android = AndroidPath().apply {
-        set(composePath.asAndroidPath())
-        transform(matrix)
-    }
-    return android.asComposePath()
-}
 
 private fun DrawScope.drawTargetLine(
     centerX: Float,
