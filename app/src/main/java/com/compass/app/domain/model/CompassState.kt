@@ -1,6 +1,7 @@
 package com.compass.app.domain.model
 
 import android.hardware.SensorManager
+import androidx.compose.runtime.Immutable
 
 enum class CompassAccuracy {
     UNKNOWN,
@@ -24,6 +25,7 @@ enum class CompassAccuracy {
     }
 }
 
+@Immutable
 data class CompassReading(
     val azimuth: Float = 0f,      // degrees, 0..360, magnetic north by default
     val pitch: Float = 0f,        // degrees
