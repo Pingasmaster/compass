@@ -124,6 +124,7 @@ fun CompassScreen(
                     AccuracyChip(
                         accuracy = reading.accuracy,
                         hasSensor = reading.hasSensor,
+                        modifier = Modifier.padding(top = 6.dp),
                     )
                 },
                 actions = {
@@ -171,6 +172,8 @@ fun CompassScreen(
                 roseBucket.second,
                 roseBucket.first,
             )
+            Spacer(Modifier.weight(1f))
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -190,14 +193,14 @@ fun CompassScreen(
                 )
             }
 
+            Spacer(Modifier.weight(1f))
+
             HeadingReadout(
                 azimuthDegrees = reading.azimuth,
                 isTrueNorth = trueNorth,
                 declination = reading.declination,
                 targetAngle = targetAngle,
             )
-
-            Spacer(Modifier.weight(1f))
 
             CalibrationBanner(accuracy = reading.accuracy)
 
