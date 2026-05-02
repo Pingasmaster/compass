@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -123,12 +124,13 @@ fun CompassRose(
 
 
     Box(modifier = modifier) {
+        // Static base layer: disc + ring outline. Independent of rotation, so it
+        // doesn't redraw on every spring frame.
         Canvas(modifier = Modifier.fillMaxSize()) {
             val w = size.width
             val h = size.height
             val cx = w / 2f
             val cy = h / 2f
-            // Rose fills the canvas; reserve a small margin for the fixed heading pointer.
             val roseRadius = minOf(w, h) / 2f - 14.dp.toPx()
 
             // Rose base disc with a ring outline. When calibrating, the ring pulses
@@ -144,37 +146,60 @@ fun CompassRose(
                 center = Offset(cx, cy),
                 style = Stroke(width = 2.dp.toPx()),
             )
+        }
 
-            // Rotating rose: ticks + letters.
-            rotate(degrees = cumulativeAngle.value, pivot = Offset(cx, cy)) {
-                drawTicks(
+        // Rotating layer: ticks + cardinals + target line. The rotation state is
+        // read inside `graphicsLayer { ... }` so spring updates only re-apply a
+        // hardware-accelerated transform on the cached RenderNode — the Canvas
+        // draw scope itself doesn't invalidate. This keeps the rose smooth in
+        // Battery Saver, where CPU throttling otherwise saturates per-frame
+        // redraws of the 72 ticks + 8 cardinal labels.
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer { rotationZ = cumulativeAngle.value },
+        ) {
+            val w = size.width
+            val h = size.height
+            val cx = w / 2f
+            val cy = h / 2f
+            val roseRadius = minOf(w, h) / 2f - 14.dp.toPx()
+
+            drawTicks(
+                centerX = cx,
+                centerY = cy,
+                outerRadius = roseRadius * 0.99f,
+                majorColor = onSurface,
+                minorColor = onSurfaceVariant,
+            )
+            drawCardinals(
+                layouts = cardinalLayouts,
+                centerX = cx,
+                centerY = cy,
+                radius = roseRadius * 0.82f,
+            )
+
+            // Target line — rotates with the rose so it stays locked to the cardinal
+            // direction the user chose, regardless of the phone's orientation.
+            if (targetAngle != null) {
+                drawTargetLine(
                     centerX = cx,
                     centerY = cy,
-                    outerRadius = roseRadius * 0.99f,
-                    majorColor = onSurface,
-                    minorColor = onSurfaceVariant,
+                    radius = roseRadius * 0.90f,
+                    angleDeg = targetAngle,
+                    color = targetColor,
                 )
-                drawCardinals(
-                    layouts = cardinalLayouts,
-                    centerX = cx,
-                    centerY = cy,
-                    radius = roseRadius * 0.82f,
-                )
-
-                // Target line — rotates with the rose so it stays locked to the cardinal
-                // direction the user chose, regardless of the phone's orientation.
-                if (targetAngle != null) {
-                    drawTargetLine(
-                        centerX = cx,
-                        centerY = cy,
-                        radius = roseRadius * 0.90f,
-                        angleDeg = targetAngle,
-                        color = targetColor,
-                    )
-                }
             }
+        }
 
-            // Fixed needle.
+        // Fixed top layer: needle + hub + heading-pointer triangle.
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val w = size.width
+            val h = size.height
+            val cx = w / 2f
+            val cy = h / 2f
+            val roseRadius = minOf(w, h) / 2f - 14.dp.toPx()
+
             val needleLen = roseRadius * 0.70f
             val needleHalfWidth = roseRadius * 0.045f
             drawNeedle(
@@ -186,11 +211,9 @@ fun CompassRose(
                 southColor = needleSouth,
             )
 
-            // Hub.
             drawCircle(color = primary, radius = roseRadius * 0.045f, center = Offset(cx, cy))
             drawCircle(color = onPrimary, radius = roseRadius * 0.018f, center = Offset(cx, cy))
 
-            // Fixed top indicator triangle (outside the rose, points at current heading).
             val tipY = cy - roseRadius - 4.dp.toPx()
             val trianglePath = ComposePath().apply {
                 moveTo(cx, tipY - 10.dp.toPx())
