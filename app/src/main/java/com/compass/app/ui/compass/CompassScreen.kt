@@ -113,7 +113,25 @@ fun CompassScreen(
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
     ) { granted ->
-        scope.launch { viewModel.prefs.setTrueNorth(granted) }
+        scope.launch {
+            viewModel.prefs.setLocationPrompted(true)
+            viewModel.prefs.setTrueNorth(granted)
+        }
+    }
+
+    // Ask once on first launch so True North works without the user having to dig
+    // into settings. After the system dialog has been shown once, never auto-prompt
+    // again — repeated requests get auto-denied by the OS, and the settings toggle
+    // remains as the explicit re-prompt path. If permission is already granted (e.g.
+    // pre-granted via system settings), just record the prompt as done.
+    val locationPrompted by viewModel.prefs.locationPrompted.collectAsStateWithLifecycle(initialValue = true)
+    LaunchedEffect(locationPrompted) {
+        if (locationPrompted) return@LaunchedEffect
+        if (hasCoarseLocationPermission(context)) {
+            viewModel.prefs.setLocationPrompted(true)
+        } else {
+            locationPermissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
+        }
     }
 
     Scaffold(
