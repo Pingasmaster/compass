@@ -1,5 +1,5 @@
 [versions]
-agp = "9.2.0-alpha07"
+agp = "9.2.0"
 kotlin-compose = "2.3.21"
 
 # The Compose BOM pins every androidx.compose.* artefact. The explicit
