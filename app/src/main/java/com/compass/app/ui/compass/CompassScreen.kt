@@ -106,14 +106,14 @@ fun CompassScreen(
     var showSettings by remember { mutableStateOf(false) }
     var showTargetDialog by remember { mutableStateOf(false) }
 
+    // Drive the True-north pref from the launcher result rather than optimistically
+    // flipping it on tap: granted → pref true (the ViewModel collect attaches the
+    // listener); denied → pref stays false. The ViewModel also auto-clears the pref
+    // when it observes pref=true with no permission, covering revoked-between-sessions.
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
     ) { granted ->
-        if (granted) {
-            viewModel.onLocationPermissionGranted()
-        } else {
-            scope.launch { viewModel.prefs.setTrueNorth(false) }
-        }
+        scope.launch { viewModel.prefs.setTrueNorth(granted) }
     }
 
     Scaffold(
@@ -235,7 +235,6 @@ fun CompassScreen(
             onTrueNorthChange = { enabled ->
                 if (enabled && !hasCoarseLocationPermission(context)) {
                     locationPermissionLauncher.launch(Manifest.permission.ACCESS_COARSE_LOCATION)
-                    scope.launch { viewModel.prefs.setTrueNorth(true) }
                 } else {
                     scope.launch { viewModel.prefs.setTrueNorth(enabled) }
                 }
@@ -329,7 +328,9 @@ private fun TargetAngleSheet(
 
             // Numpad text entry — lets the user type an exact bearing. Bidirectional
             // with the slider; the field only drives the slider while focused, and
-            // the slider only drives the field while the field is unfocused.
+            // the slider only drives the field while the field is unfocused. On blur
+            // we always snap the field back to the slider so out-of-range or empty
+            // typed values can't outlive the focus and mislead the Set button.
             val focusManager = LocalFocusManager.current
             val sliderValueInt by remember {
                 derivedStateOf { sliderState.value.toInt() }
@@ -358,7 +359,13 @@ private fun TargetAngleSheet(
                 keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .onFocusChanged { fieldFocused = it.isFocused },
+                    .onFocusChanged { focusState ->
+                        val wasFocused = fieldFocused
+                        fieldFocused = focusState.isFocused
+                        if (wasFocused && !focusState.isFocused) {
+                            fieldText = sliderValueInt.toString()
+                        }
+                    },
             )
 
             Spacer(Modifier.height(12.dp))

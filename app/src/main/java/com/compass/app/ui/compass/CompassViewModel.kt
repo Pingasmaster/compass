@@ -3,9 +3,7 @@ package com.compass.app.ui.compass
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Application
-import android.content.Context
 import android.content.pm.PackageManager
-import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import androidx.lifecycle.AndroidViewModel
@@ -58,35 +56,37 @@ class CompassViewModel(
     init {
         viewModelScope.launch {
             prefs.trueNorthEnabled.collect { enabled ->
-                sensor.setTrueNorthEnabled(enabled)
-                if (enabled) {
-                    requestLocationIfPermitted(application)
-                } else {
-                    stopLocationUpdates()
+                // If the pref says true but the runtime permission is gone (revoked
+                // between sessions, or never granted), pull the toggle back to false
+                // so the readout doesn't claim "+0.0° declination" while silently
+                // showing magnetic readings.
+                if (enabled && !hasCoarseLocationPermission()) {
+                    prefs.setTrueNorth(false)
+                    return@collect
                 }
+                sensor.setTrueNorthEnabled(enabled)
+                if (enabled) requestLocationIfPermitted() else stopLocationUpdates()
             }
         }
     }
 
-    /** Called by UI after a successful permission grant to attach a location listener. */
-    fun onLocationPermissionGranted() {
-        requestLocationIfPermitted(getApplication())
-    }
+    private fun hasCoarseLocationPermission(): Boolean =
+        getApplication<Application>().checkSelfPermission(
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+        ) == PackageManager.PERMISSION_GRANTED
 
-    // Permission is re-checked on the first three lines below; the suppression
-    // covers the lint pass that can't follow the guard back to the callsite.
+    // Permission is re-checked below; the suppression covers the lint pass that
+    // can't follow the guard back to the callsite.
     @SuppressLint("MissingPermission")
-    private fun requestLocationIfPermitted(context: Context) {
+    private fun requestLocationIfPermitted() {
         val manager = locationManager ?: return
-        val granted = context.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) ==
-            PackageManager.PERMISSION_GRANTED
-        if (!granted) return
+        if (!hasCoarseLocationPermission()) return
+        // GPS_PROVIDER requires ACCESS_FINE_LOCATION on API 28+; the app only
+        // declares coarse, so the GPS path would crash with SecurityException.
+        // Network-provider precision is plenty for declination correction.
+        if (!manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) return
         stopLocationUpdates()
-        val provider = when {
-            manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
-            manager.isProviderEnabled(LocationManager.GPS_PROVIDER) -> LocationManager.GPS_PROVIDER
-            else -> return
-        }
+        val provider = LocationManager.NETWORK_PROVIDER
         // LocationListener gained default implementations for onStatusChanged,
         // onProviderEnabled and onProviderDisabled in API 29, so on minSdk 31 we
         // only need to override onLocationChanged.
