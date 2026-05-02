@@ -26,6 +26,7 @@ class UserPreferences(private val context: Context) {
     private val OLED_BLACK_KEY = booleanPreferencesKey("oled_black")
     private val TRUE_NORTH_KEY = booleanPreferencesKey("true_north")
     private val RESPONSIVENESS_KEY = stringPreferencesKey("responsiveness")
+    private val LOCATION_PROMPTED_KEY = booleanPreferencesKey("location_prompted")
 
     // Fall back to an empty preferences snapshot on IOException (corrupt file, no
     // free inode, SELinux denial) so a broken prefs store degrades to defaults
@@ -57,6 +58,9 @@ class UserPreferences(private val context: Context) {
 
     val trueNorthEnabled: Flow<Boolean> =
         safeData.map { it[TRUE_NORTH_KEY] ?: false }
+
+    val locationPrompted: Flow<Boolean> =
+        safeData.map { it[LOCATION_PROMPTED_KEY] ?: false }
 
     val responsiveness: Flow<Responsiveness> =
         safeData.map {
@@ -92,6 +96,8 @@ class UserPreferences(private val context: Context) {
     suspend fun setOledBlack(enabled: Boolean) = writePrefs { it[OLED_BLACK_KEY] = enabled }
 
     suspend fun setTrueNorth(enabled: Boolean) = writePrefs { it[TRUE_NORTH_KEY] = enabled }
+
+    suspend fun setLocationPrompted(value: Boolean) = writePrefs { it[LOCATION_PROMPTED_KEY] = value }
 
     // DataStore.edit is atomic: on IOException the previous value is preserved, so
     // logging + swallowing is enough to keep a background write failure from crashing
