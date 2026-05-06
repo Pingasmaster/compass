@@ -1,26 +1,44 @@
 #!/usr/bin/env bash
 #
 # Usage:
-#   ./build.sh                 # incremental build, no version bump
-#   ./build.sh --clean         # force a clean build
+#   ./build.sh                 # full build, no version bump
+#   ./build.sh --clean         # just run gradle clean, nothing else
 #   ./build.sh --bump          # after a successful build, bump version
-#   ./build.sh --clean --bump  # both
+#   ./build.sh --clean --bump  # just clean (bump flag ignored when --clean is present)
 #
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-DO_CLEAN=0
+DO_CLEAN_ONLY=0
 DO_BUMP=0
+
+ROOT_APK="app-release.apk"
 for arg in "$@"; do
     case "$arg" in
-        --clean) DO_CLEAN=1 ;;
+        --clean) DO_CLEAN_ONLY=1 ;;
         --bump)  DO_BUMP=1 ;;
         *) echo "Unknown arg: $arg (accepted: --clean, --bump)" >&2; exit 2 ;;
     esac
 done
 
+# --clean: just run gradle clean and exit, do nothing else (even with --bump)
+if [[ "$DO_CLEAN_ONLY" -eq 1 ]]; then
+    LOCKFILE="$SCRIPT_DIR/.build.lock"
+    exec 9>"$LOCKFILE"
+    if ! flock -n 9; then
+        echo "Another build is already running. Exiting."
+        exit 1
+    fi
+    trap 'rm -f "$LOCKFILE"' EXIT
+    JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew clean
+    rm -f "$ROOT_APK"
+    echo "Clean complete."
+    exit 0
+fi
+
+# Default: full build (unchanged from original behavior)
 LOCKFILE="$SCRIPT_DIR/.build.lock"
 exec 9>"$LOCKFILE"
 if ! flock -n 9; then
@@ -30,13 +48,9 @@ fi
 trap 'rm -f "$LOCKFILE"' EXIT
 
 GRADLE_APK="app/build/outputs/apk/release/app-release.apk"
-ROOT_APK="app-release.apk"
 BUILD_GRADLE="app/build.gradle.kts"
 
 GRADLE_TASKS=(lint assembleDebug assembleRelease test)
-if [[ "$DO_CLEAN" -eq 1 ]]; then
-    GRADLE_TASKS=(clean "${GRADLE_TASKS[@]}")
-fi
 
 JAVA_HOME=/usr/lib/jvm/java-21-openjdk ./gradlew "${GRADLE_TASKS[@]}"
 
