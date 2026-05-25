@@ -13,8 +13,8 @@ android {
         applicationId = "com.compass.app"
         minSdk = 31
         targetSdk = 37
-        versionCode = 21
-        versionName = "1.0.20"
+        versionCode = 22
+        versionName = "1.0.21"
     }
 
     buildTypes {
@@ -97,7 +97,6 @@ dependencies {
     implementation(libs.compose.animation)
 
     implementation(libs.material3)
-    implementation(libs.material.icons.extended)
     implementation(libs.material3.adaptive)
     implementation(libs.graphics.shapes)
 
