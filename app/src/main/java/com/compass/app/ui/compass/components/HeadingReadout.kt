@@ -71,8 +71,11 @@ fun HeadingReadout(
         val delta = shortestAngularDiff(animated, t)
         (1f - (abs(delta) / 10f)).coerceIn(0f, 1f)
     } ?: 0f
-    val headingColor = if (targetAngle == null) defaultHeadingColor
-        else lerp(defaultHeadingColor, targetHitColor, proximity)
+    val headingColor = if (targetAngle == null) {
+        defaultHeadingColor
+    } else {
+        lerp(defaultHeadingColor, targetHitColor, proximity)
+    }
 
     val slowEffects = motionScheme.slowEffectsSpec<Float>()
     val fastSpatial = motionScheme.fastSpatialSpec<IntOffset>()
@@ -96,8 +99,11 @@ fun HeadingReadout(
             Text(
                 text = "°",
                 style = MaterialTheme.typography.displayMedium,
-                color = if (targetAngle == null) MaterialTheme.colorScheme.primary
-                    else lerp(MaterialTheme.colorScheme.primary, targetHitColor, proximity),
+                color = if (targetAngle == null) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    lerp(MaterialTheme.colorScheme.primary, targetHitColor, proximity)
+                },
                 modifier = Modifier.padding(bottom = 16.dp),
             )
         }
@@ -110,7 +116,7 @@ fun HeadingReadout(
                 (fadeIn(animationSpec = slowEffects) + slideInVertically(animationSpec = fastSpatial) { it / 3 })
                     .togetherWith(
                         fadeOut(animationSpec = slowEffects) +
-                            slideOutVertically(animationSpec = fastSpatial) { -it / 3 }
+                            slideOutVertically(animationSpec = fastSpatial) { -it / 3 },
                     )
             },
             label = "cardinalAnim",

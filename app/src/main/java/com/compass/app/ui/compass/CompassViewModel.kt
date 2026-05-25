@@ -22,10 +22,7 @@ import kotlinx.coroutines.launch
 
 private const val KEY_TARGET_ANGLE = "target_angle"
 
-class CompassViewModel(
-    application: Application,
-    private val savedState: SavedStateHandle,
-) : AndroidViewModel(application) {
+class CompassViewModel(application: Application, private val savedState: SavedStateHandle) : AndroidViewModel(application) {
 
     val prefs: UserPreferences = (application as CompassApplication).userPreferences
 
@@ -70,10 +67,9 @@ class CompassViewModel(
         }
     }
 
-    private fun hasCoarseLocationPermission(): Boolean =
-        getApplication<Application>().checkSelfPermission(
-            Manifest.permission.ACCESS_COARSE_LOCATION,
-        ) == PackageManager.PERMISSION_GRANTED
+    private fun hasCoarseLocationPermission(): Boolean = getApplication<Application>().checkSelfPermission(
+        Manifest.permission.ACCESS_COARSE_LOCATION,
+    ) == PackageManager.PERMISSION_GRANTED
 
     // Permission is re-checked below; the suppression covers the lint pass that
     // can't follow the guard back to the callsite.

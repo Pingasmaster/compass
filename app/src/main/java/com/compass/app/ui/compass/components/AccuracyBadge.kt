@@ -43,10 +43,7 @@ import com.compass.app.domain.model.CompassAccuracy
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun CalibrationBanner(
-    accuracy: CompassAccuracy,
-    modifier: Modifier = Modifier,
-) {
+fun CalibrationBanner(accuracy: CompassAccuracy, modifier: Modifier = Modifier) {
     AnimatedVisibility(
         visible = accuracy.needsCalibration,
         enter = fadeIn() + expandVertically(),
@@ -86,37 +83,38 @@ fun CalibrationBanner(
 }
 
 @Composable
-fun AccuracyChip(
-    accuracy: CompassAccuracy,
-    hasSensor: Boolean,
-    modifier: Modifier = Modifier,
-) {
+fun AccuracyChip(accuracy: CompassAccuracy, hasSensor: Boolean, modifier: Modifier = Modifier) {
     val (labelRes, container, onContainer) = when {
         !hasSensor -> Triple(
             R.string.accuracy_no_sensor,
             MaterialTheme.colorScheme.errorContainer,
             MaterialTheme.colorScheme.onErrorContainer,
         )
+
         accuracy == CompassAccuracy.HIGH -> Triple(
             R.string.accuracy_high,
             MaterialTheme.colorScheme.primaryContainer,
             MaterialTheme.colorScheme.onPrimaryContainer,
         )
+
         accuracy == CompassAccuracy.MEDIUM -> Triple(
             R.string.accuracy_medium,
             MaterialTheme.colorScheme.secondaryContainer,
             MaterialTheme.colorScheme.onSecondaryContainer,
         )
+
         accuracy == CompassAccuracy.LOW -> Triple(
             R.string.accuracy_low,
             MaterialTheme.colorScheme.tertiaryContainer,
             MaterialTheme.colorScheme.onTertiaryContainer,
         )
+
         accuracy == CompassAccuracy.UNRELIABLE -> Triple(
             R.string.accuracy_unreliable,
             MaterialTheme.colorScheme.errorContainer,
             MaterialTheme.colorScheme.onErrorContainer,
         )
+
         else -> Triple(
             R.string.accuracy_unknown,
             MaterialTheme.colorScheme.surfaceContainerHigh,

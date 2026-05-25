@@ -111,7 +111,9 @@ class CompassSensor(context: Context) {
             override fun onSensorChanged(event: SensorEvent) {
                 if (event.sensor.type != Sensor.TYPE_ROTATION_VECTOR &&
                     event.sensor.type != Sensor.TYPE_GEOMAGNETIC_ROTATION_VECTOR
-                ) return
+                ) {
+                    return
+                }
 
                 SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
 

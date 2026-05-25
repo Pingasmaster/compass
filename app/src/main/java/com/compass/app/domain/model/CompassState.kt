@@ -8,7 +8,8 @@ enum class CompassAccuracy {
     UNRELIABLE,
     LOW,
     MEDIUM,
-    HIGH;
+    HIGH,
+    ;
 
     val needsCalibration: Boolean
         get() = this == UNRELIABLE || this == LOW
@@ -16,10 +17,15 @@ enum class CompassAccuracy {
     companion object {
         fun fromSensorStatus(status: Int): CompassAccuracy = when (status) {
             SensorManager.SENSOR_STATUS_NO_CONTACT,
-            SensorManager.SENSOR_STATUS_UNRELIABLE -> UNRELIABLE
+            SensorManager.SENSOR_STATUS_UNRELIABLE,
+            -> UNRELIABLE
+
             SensorManager.SENSOR_STATUS_ACCURACY_LOW -> LOW
+
             SensorManager.SENSOR_STATUS_ACCURACY_MEDIUM -> MEDIUM
+
             SensorManager.SENSOR_STATUS_ACCURACY_HIGH -> HIGH
+
             else -> UNKNOWN
         }
     }
@@ -27,10 +33,10 @@ enum class CompassAccuracy {
 
 @Immutable
 data class CompassReading(
-    val azimuth: Float = 0f,      // degrees, 0..360, magnetic north by default
-    val pitch: Float = 0f,        // degrees
-    val roll: Float = 0f,         // degrees
-    val declination: Float = 0f,  // degrees, applied when trueNorth is on
+    val azimuth: Float = 0f, // degrees, 0..360, magnetic north by default
+    val pitch: Float = 0f, // degrees
+    val roll: Float = 0f, // degrees
+    val declination: Float = 0f, // degrees, applied when trueNorth is on
     val accuracy: CompassAccuracy = CompassAccuracy.UNKNOWN,
     val hasSensor: Boolean = true,
 )

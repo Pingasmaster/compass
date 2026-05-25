@@ -1,0 +1,38 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>ComposableParamOrder:CompassRose.kt:@OptIn(ExperimentalMaterial3ExpressiveApi::class) @Composable fun CompassRose</ID>
+    <ID>EmptyFunctionBlock:CompassSensor.kt:CompassSensor.&lt;no name provided&gt;${}</ID>
+    <ID>LongMethod:CompassRose.kt:@OptIn(ExperimentalMaterial3ExpressiveApi::class) @Composable fun CompassRose</ID>
+    <ID>LongMethod:CompassScreen.kt:@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class) @Composable fun CompassScreen</ID>
+    <ID>LongMethod:CompassScreen.kt:@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class) @Composable private fun TargetAngleSheet</ID>
+    <ID>LongMethod:HeadingReadout.kt:@OptIn(ExperimentalMaterial3ExpressiveApi::class) @Composable fun HeadingReadout</ID>
+    <ID>LongMethod:SettingsSheet.kt:@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class) @Composable fun SettingsSheet</ID>
+    <ID>MagicNumber:AzimuthSmoother.kt:180f</ID>
+    <ID>MagicNumber:AzimuthSmoother.kt:AzimuthSmoother$360f</ID>
+    <ID>MagicNumber:CompassRose.kt:72</ID>
+    <ID>MagicNumber:CompassState.kt:112.5f</ID>
+    <ID>MagicNumber:CompassState.kt:157.5f</ID>
+    <ID>MagicNumber:CompassState.kt:202.5f</ID>
+    <ID>MagicNumber:CompassState.kt:22.5f</ID>
+    <ID>MagicNumber:CompassState.kt:247.5f</ID>
+    <ID>MagicNumber:CompassState.kt:292.5f</ID>
+    <ID>MagicNumber:CompassState.kt:337.5f</ID>
+    <ID>MagicNumber:CompassState.kt:67.5f</ID>
+    <ID>MagicNumber:CompassViewModel.kt:CompassViewModel$60_000L</ID>
+    <ID>MagicNumber:Theme.kt:0.70f</ID>
+    <ID>MagicNumber:Theme.kt:0.80f</ID>
+    <ID>MagicNumber:Theme.kt:0.90f</ID>
+    <ID>MagicNumber:Theme.kt:0.92f</ID>
+    <ID>MagicNumber:Theme.kt:0.95f</ID>
+    <ID>ModifierMissing:CompassScreen.kt:@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class) @Composable fun CompassScreen</ID>
+    <ID>MultipleEmitters:CompassScreen.kt:@OptIn(ExperimentalMaterial3ExpressiveApi::class) @Composable private fun TopBarActions</ID>
+    <ID>VariableNaming:UserPreferences.kt:UserPreferences$private val DYNAMIC_COLOR_KEY = booleanPreferencesKey("dynamic_color")</ID>
+    <ID>VariableNaming:UserPreferences.kt:UserPreferences$private val LOCATION_PROMPTED_KEY = booleanPreferencesKey("location_prompted")</ID>
+    <ID>VariableNaming:UserPreferences.kt:UserPreferences$private val OLED_BLACK_KEY = booleanPreferencesKey("oled_black")</ID>
+    <ID>VariableNaming:UserPreferences.kt:UserPreferences$private val RESPONSIVENESS_KEY = stringPreferencesKey("responsiveness")</ID>
+    <ID>VariableNaming:UserPreferences.kt:UserPreferences$private val THEME_MODE_KEY = stringPreferencesKey("theme_mode")</ID>
+    <ID>VariableNaming:UserPreferences.kt:UserPreferences$private val TRUE_NORTH_KEY = booleanPreferencesKey("true_north")</ID>
+  </CurrentIssues>
+</SmellBaseline>

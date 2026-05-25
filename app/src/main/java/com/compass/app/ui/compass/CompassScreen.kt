@@ -5,6 +5,9 @@ import android.content.Context
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.interaction.DragInteraction
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,9 +21,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.interaction.DragInteraction
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.PressInteraction
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -83,15 +83,12 @@ import com.compass.app.ui.compass.components.CalibrationBanner
 import com.compass.app.ui.compass.components.CompassRose
 import com.compass.app.ui.compass.components.HeadingReadout
 import com.compass.app.ui.settings.SettingsSheet
-import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun CompassScreen(
-    isDark: Boolean,
-    viewModel: CompassViewModel = viewModel(),
-) {
+fun CompassScreen(isDark: Boolean, viewModel: CompassViewModel = viewModel()) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -154,10 +151,16 @@ fun CompassScreen(
             val targetActive = targetAngle != null
             FloatingActionButton(
                 onClick = { showTargetDialog = true },
-                containerColor = if (targetActive) MaterialTheme.colorScheme.tertiaryContainer
-                    else MaterialTheme.colorScheme.primaryContainer,
-                contentColor = if (targetActive) MaterialTheme.colorScheme.onTertiaryContainer
-                    else MaterialTheme.colorScheme.onPrimaryContainer,
+                containerColor = if (targetActive) {
+                    MaterialTheme.colorScheme.tertiaryContainer
+                } else {
+                    MaterialTheme.colorScheme.primaryContainer
+                },
+                contentColor = if (targetActive) {
+                    MaterialTheme.colorScheme.onTertiaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                },
                 shape = FloatingActionButtonDefaults.shape,
             ) {
                 Icon(
@@ -288,11 +291,7 @@ private fun TopBarActions(onSettings: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun TargetAngleSheet(
-    currentTarget: Float?,
-    onConfirm: (Float?) -> Unit,
-    onDismiss: () -> Unit,
-) {
+private fun TargetAngleSheet(currentTarget: Float?, onConfirm: (Float?) -> Unit, onDismiss: () -> Unit) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val sliderState = remember {
         SliderState(
@@ -396,11 +395,14 @@ private fun TargetAngleSheet(
                 interactionSource.interactions.collect { interaction ->
                     when (interaction) {
                         is DragInteraction.Start,
-                        is PressInteraction.Press -> tooltipState.show()
+                        is PressInteraction.Press,
+                        -> tooltipState.show()
+
                         is DragInteraction.Stop,
                         is DragInteraction.Cancel,
                         is PressInteraction.Release,
-                        is PressInteraction.Cancel -> tooltipState.dismiss()
+                        is PressInteraction.Cancel,
+                        -> tooltipState.dismiss()
                     }
                 }
             }

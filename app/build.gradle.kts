@@ -1,6 +1,8 @@
 plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.plugin.compose")
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.ktlint)
+    alias(libs.plugins.detekt)
 }
 
 android {
@@ -11,8 +13,8 @@ android {
         applicationId = "com.compass.app"
         minSdk = 31
         targetSdk = 37
-        versionCode = 19
-        versionName = "1.0.18"
+        versionCode = 20
+        versionName = "1.0.19"
     }
 
     buildTypes {
@@ -21,7 +23,7 @@ android {
             isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
             // WARNING: release APK is signed with the debug keystore for local
             // iteration convenience. Wire a real signingConfig before Play
@@ -45,6 +47,41 @@ android {
         compose = true
         buildConfig = false
     }
+
+    lint {
+        abortOnError = true
+        warningsAsErrors = false
+        checkDependencies = true
+        checkReleaseBuilds = true
+        explainIssues = true
+        showAll = true
+        htmlReport = true
+        xmlReport = true
+        sarifReport = true
+        baseline = file("lint-baseline.xml")
+        lintConfig = rootProject.file("config/lint/lint.xml")
+    }
+}
+
+ktlint {
+    version.set(libs.versions.ktlint.engine.get())
+    android.set(true)
+    ignoreFailures.set(false)
+    filter {
+        exclude { it.file.path.contains("/build/") }
+    }
+    reporters {
+        reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.PLAIN)
+        reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.SARIF)
+    }
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    allRules = false
+    config.setFrom(rootProject.files("config/detekt/detekt.yml"))
+    baseline = rootProject.file("config/detekt/detekt-baseline.xml")
+    parallel = true
 }
 
 dependencies {
@@ -73,4 +110,8 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)
+
+    detektPlugins(libs.detekt.compose)
+    lintChecks(libs.lint.slack.checks)
+    lintChecks(libs.lint.slack.compose)
 }
