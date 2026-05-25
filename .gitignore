@@ -9,10 +9,16 @@ CLAUDE.md
 .kotlin/
 /build/
 /app/build/
+**/build/
 /captures/
 .build.lock
 /out/
 /app/out/
+
+# Static analysis stack:
+# tracked: config/detekt/detekt.yml, config/detekt/detekt-baseline.xml,
+#          config/lint/lint.xml, app/lint-baseline.xml, .editorconfig
+# ignored: ktlint / detekt / lint reports live under build/ (covered above)
 
 # Generated / intermediate
 .externalNativeBuild/

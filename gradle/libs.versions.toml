@@ -5,16 +5,16 @@ kotlin-compose = "2.3.21"
 # The Compose BOM pins every androidx.compose.* artefact. The explicit
 # `compose` version was removed — let the BOM be the single source of truth
 # so runtime/ui/foundation/animation don't drift.
-compose-bom = "2026.05.00"
-material3 = "1.5.0-alpha19"
-material3-adaptive = "1.3.0-beta01"
+compose-bom = "2026.05.01"
+material3 = "1.5.0-alpha20"
+material3-adaptive = "1.3.0-beta02"
 graphics-shapes = "1.1.0"
 
 activity-compose = "1.13.0"
-lifecycle = "2.11.0-beta01"
+lifecycle = "2.11.0-beta02"
 
 datastore = "1.3.0-alpha09"
-coroutines = "1.11.0-rc02"
+coroutines = "1.11.0"
 
 junit = "4.13.2"
 
