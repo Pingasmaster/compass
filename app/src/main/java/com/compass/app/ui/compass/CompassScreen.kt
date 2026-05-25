@@ -24,9 +24,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.GpsFixed
-import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -67,6 +64,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -167,7 +165,7 @@ fun CompassScreen(isDark: Boolean, modifier: Modifier = Modifier, viewModel: Com
                 shape = FloatingActionButtonDefaults.shape,
             ) {
                 Icon(
-                    imageVector = Icons.Rounded.GpsFixed,
+                    painter = painterResource(R.drawable.ic_gps_fixed_24),
                     contentDescription = stringResource(R.string.action_set_target_angle),
                 )
             }
@@ -285,7 +283,7 @@ private fun RowScope.TopBarActions(onSettings: () -> Unit) {
         modifier = Modifier.size(56.dp),
     ) {
         Icon(
-            imageVector = Icons.Rounded.Settings,
+            painter = painterResource(R.drawable.ic_settings_24),
             contentDescription = stringResource(R.string.action_settings),
         )
     }
