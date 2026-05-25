@@ -1,13 +1,14 @@
 package com.compass.app.ui.settings
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -27,7 +28,6 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.annotation.StringRes
 import com.compass.app.R
 import com.compass.app.data.preferences.Responsiveness
 import com.compass.app.data.preferences.ThemeMode
@@ -159,19 +159,28 @@ fun SettingsSheet(
                 titleRes = R.string.settings_dynamic_color,
                 subtitleRes = R.string.settings_dynamic_color_desc,
                 checked = dynamicColor,
-                onCheckedChange = { haptics.tick(); onDynamicColorChange(it) },
+                onCheckedChange = {
+                    haptics.tick()
+                    onDynamicColorChange(it)
+                },
             )
             ToggleRow(
                 titleRes = R.string.settings_oled_dark,
                 subtitleRes = R.string.settings_oled_dark_desc,
                 checked = oledBlack,
-                onCheckedChange = { haptics.tick(); onOledBlackChange(it) },
+                onCheckedChange = {
+                    haptics.tick()
+                    onOledBlackChange(it)
+                },
             )
             ToggleRow(
                 titleRes = R.string.settings_true_north,
                 subtitleRes = R.string.settings_true_north_desc,
                 checked = trueNorth,
-                onCheckedChange = { haptics.tick(); onTrueNorthChange(it) },
+                onCheckedChange = {
+                    haptics.tick()
+                    onTrueNorthChange(it)
+                },
             )
             Spacer(Modifier.height(24.dp))
         }
@@ -193,12 +202,7 @@ private fun SectionLabel(label: String) {
 }
 
 @Composable
-private fun ToggleRow(
-    @StringRes titleRes: Int,
-    @StringRes subtitleRes: Int,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
+private fun ToggleRow(@StringRes titleRes: Int, @StringRes subtitleRes: Int, checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()

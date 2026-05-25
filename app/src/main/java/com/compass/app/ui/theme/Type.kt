@@ -20,7 +20,7 @@ val RobotoFlex: FontFamily = FontFamily(
             Font(DeviceFontFamilyName("Roboto Flex"), weight),
             Font(DeviceFontFamilyName("Roboto"), weight),
         )
-    }
+    },
 )
 
 private val Roboto = RobotoFlex

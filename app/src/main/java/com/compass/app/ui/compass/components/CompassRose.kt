@@ -21,7 +21,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
-import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -40,6 +39,7 @@ import com.compass.app.data.preferences.Responsiveness
 import com.compass.app.domain.sensor.unwrapAngle
 import com.compass.app.ui.theme.NorthRed
 import com.compass.app.ui.theme.NorthRedDark
+import kotlinx.coroutines.flow.collectLatest
 import kotlin.math.cos
 import kotlin.math.sin
 import androidx.compose.ui.graphics.Path as ComposePath
@@ -105,8 +105,12 @@ fun CompassRose(
     // the rose redraws at sensor rate (~50 Hz), so doing it inside draw was cheap but
     // not free.
     val cardinalLayouts = remember(
-        cardinalStyle, intercardinalStyle, textMeasurer,
-        needleNorth, onSurface, onSurfaceVariant,
+        cardinalStyle,
+        intercardinalStyle,
+        textMeasurer,
+        needleNorth,
+        onSurface,
+        onSurfaceVariant,
     ) {
         CardinalMarkers.map { marker ->
             val style = if (marker.main) cardinalStyle else intercardinalStyle
@@ -121,7 +125,6 @@ fun CompassRose(
             )
         }
     }
-
 
     Box(modifier = modifier) {
         // Static base layer: disc + ring outline. Independent of rotation, so it
@@ -226,37 +229,34 @@ fun CompassRose(
     }
 }
 
-
 private fun Responsiveness.toSpringSpec(): AnimationSpec<Float> = when (this) {
     Responsiveness.SLOWEST -> spring(
         dampingRatio = Spring.DampingRatioLowBouncy,
         stiffness = 30f,
     )
+
     Responsiveness.SLOW -> spring(
         dampingRatio = Spring.DampingRatioLowBouncy,
         stiffness = 80f,
     )
+
     Responsiveness.NORMAL -> spring(
         dampingRatio = Spring.DampingRatioLowBouncy,
         stiffness = Spring.StiffnessLow,
     )
+
     Responsiveness.FAST -> spring(
         dampingRatio = Spring.DampingRatioMediumBouncy,
         stiffness = Spring.StiffnessMediumLow,
     )
+
     Responsiveness.FASTEST -> spring(
         dampingRatio = Spring.DampingRatioNoBouncy,
         stiffness = Spring.StiffnessMedium,
     )
 }
 
-private fun DrawScope.drawTargetLine(
-    centerX: Float,
-    centerY: Float,
-    radius: Float,
-    angleDeg: Float,
-    color: Color,
-) {
+private fun DrawScope.drawTargetLine(centerX: Float, centerY: Float, radius: Float, angleDeg: Float, color: Color) {
     // angle 0° points north (up); x-axis in screen coords goes right.
     rotate(degrees = angleDeg, pivot = Offset(centerX, centerY)) {
         drawLine(
@@ -278,13 +278,7 @@ private fun DrawScope.drawTargetLine(
     }
 }
 
-private fun DrawScope.drawTicks(
-    centerX: Float,
-    centerY: Float,
-    outerRadius: Float,
-    majorColor: Color,
-    minorColor: Color,
-) {
+private fun DrawScope.drawTicks(centerX: Float, centerY: Float, outerRadius: Float, majorColor: Color, minorColor: Color) {
     val majorLen = outerRadius * 0.12f
     val minorLen = outerRadius * 0.055f
     for (i in 0 until 72) {
@@ -347,14 +341,7 @@ private fun pulsingRingColor(base: Color, pulse: Color): Color {
     return androidx.compose.ui.graphics.lerp(base, pulse, alpha)
 }
 
-private fun DrawScope.drawNeedle(
-    centerX: Float,
-    centerY: Float,
-    length: Float,
-    halfWidth: Float,
-    northColor: Color,
-    southColor: Color,
-) {
+private fun DrawScope.drawNeedle(centerX: Float, centerY: Float, length: Float, halfWidth: Float, northColor: Color, southColor: Color) {
     val northPath = ComposePath().apply {
         moveTo(centerX, centerY - length)
         lineTo(centerX - halfWidth, centerY)

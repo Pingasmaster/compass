@@ -42,7 +42,9 @@ fun CompassTheme(
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
+
         darkTheme -> DarkColorScheme
+
         else -> LightColorScheme
     }
 
@@ -81,51 +83,45 @@ private fun ColorScheme.toOledBlack(): ColorScheme = copy(
     surfaceContainerHighest = surfaceContainerHighest.lerpToBlack(0.70f),
 )
 
-private fun Color.lerpToBlack(amount: Float): Color =
-    androidx.compose.ui.graphics.lerp(this, Color.Black, amount.coerceIn(0f, 1f))
+private fun Color.lerpToBlack(amount: Float): Color = androidx.compose.ui.graphics.lerp(this, Color.Black, amount.coerceIn(0f, 1f))
 
 @Composable
-private fun ColorScheme.animated(
-    accentSpec: AnimationSpec<Color>,
-    surfaceSpec: AnimationSpec<Color>,
-): ColorScheme {
-    return copy(
-        primary = animateColorAsState(primary, accentSpec).value,
-        onPrimary = animateColorAsState(onPrimary, accentSpec).value,
-        primaryContainer = animateColorAsState(primaryContainer, accentSpec).value,
-        onPrimaryContainer = animateColorAsState(onPrimaryContainer, accentSpec).value,
-        inversePrimary = animateColorAsState(inversePrimary, accentSpec).value,
-        secondary = animateColorAsState(secondary, accentSpec).value,
-        onSecondary = animateColorAsState(onSecondary, accentSpec).value,
-        secondaryContainer = animateColorAsState(secondaryContainer, accentSpec).value,
-        onSecondaryContainer = animateColorAsState(onSecondaryContainer, accentSpec).value,
-        tertiary = animateColorAsState(tertiary, accentSpec).value,
-        onTertiary = animateColorAsState(onTertiary, accentSpec).value,
-        tertiaryContainer = animateColorAsState(tertiaryContainer, accentSpec).value,
-        onTertiaryContainer = animateColorAsState(onTertiaryContainer, accentSpec).value,
-        // Background / surface slots use the slow spec to avoid theme-flip flash.
-        background = animateColorAsState(background, surfaceSpec).value,
-        onBackground = animateColorAsState(onBackground, surfaceSpec).value,
-        surface = animateColorAsState(surface, surfaceSpec).value,
-        onSurface = animateColorAsState(onSurface, surfaceSpec).value,
-        surfaceVariant = animateColorAsState(surfaceVariant, surfaceSpec).value,
-        onSurfaceVariant = animateColorAsState(onSurfaceVariant, surfaceSpec).value,
-        surfaceTint = animateColorAsState(surfaceTint, surfaceSpec).value,
-        inverseSurface = animateColorAsState(inverseSurface, surfaceSpec).value,
-        inverseOnSurface = animateColorAsState(inverseOnSurface, surfaceSpec).value,
-        error = animateColorAsState(error, accentSpec).value,
-        onError = animateColorAsState(onError, accentSpec).value,
-        errorContainer = animateColorAsState(errorContainer, accentSpec).value,
-        onErrorContainer = animateColorAsState(onErrorContainer, accentSpec).value,
-        outline = animateColorAsState(outline, surfaceSpec).value,
-        outlineVariant = animateColorAsState(outlineVariant, surfaceSpec).value,
-        scrim = animateColorAsState(scrim, surfaceSpec).value,
-        surfaceBright = animateColorAsState(surfaceBright, surfaceSpec).value,
-        surfaceDim = animateColorAsState(surfaceDim, surfaceSpec).value,
-        surfaceContainer = animateColorAsState(surfaceContainer, surfaceSpec).value,
-        surfaceContainerHigh = animateColorAsState(surfaceContainerHigh, surfaceSpec).value,
-        surfaceContainerHighest = animateColorAsState(surfaceContainerHighest, surfaceSpec).value,
-        surfaceContainerLow = animateColorAsState(surfaceContainerLow, surfaceSpec).value,
-        surfaceContainerLowest = animateColorAsState(surfaceContainerLowest, surfaceSpec).value,
-    )
-}
+private fun ColorScheme.animated(accentSpec: AnimationSpec<Color>, surfaceSpec: AnimationSpec<Color>): ColorScheme = copy(
+    primary = animateColorAsState(primary, accentSpec).value,
+    onPrimary = animateColorAsState(onPrimary, accentSpec).value,
+    primaryContainer = animateColorAsState(primaryContainer, accentSpec).value,
+    onPrimaryContainer = animateColorAsState(onPrimaryContainer, accentSpec).value,
+    inversePrimary = animateColorAsState(inversePrimary, accentSpec).value,
+    secondary = animateColorAsState(secondary, accentSpec).value,
+    onSecondary = animateColorAsState(onSecondary, accentSpec).value,
+    secondaryContainer = animateColorAsState(secondaryContainer, accentSpec).value,
+    onSecondaryContainer = animateColorAsState(onSecondaryContainer, accentSpec).value,
+    tertiary = animateColorAsState(tertiary, accentSpec).value,
+    onTertiary = animateColorAsState(onTertiary, accentSpec).value,
+    tertiaryContainer = animateColorAsState(tertiaryContainer, accentSpec).value,
+    onTertiaryContainer = animateColorAsState(onTertiaryContainer, accentSpec).value,
+    // Background / surface slots use the slow spec to avoid theme-flip flash.
+    background = animateColorAsState(background, surfaceSpec).value,
+    onBackground = animateColorAsState(onBackground, surfaceSpec).value,
+    surface = animateColorAsState(surface, surfaceSpec).value,
+    onSurface = animateColorAsState(onSurface, surfaceSpec).value,
+    surfaceVariant = animateColorAsState(surfaceVariant, surfaceSpec).value,
+    onSurfaceVariant = animateColorAsState(onSurfaceVariant, surfaceSpec).value,
+    surfaceTint = animateColorAsState(surfaceTint, surfaceSpec).value,
+    inverseSurface = animateColorAsState(inverseSurface, surfaceSpec).value,
+    inverseOnSurface = animateColorAsState(inverseOnSurface, surfaceSpec).value,
+    error = animateColorAsState(error, accentSpec).value,
+    onError = animateColorAsState(onError, accentSpec).value,
+    errorContainer = animateColorAsState(errorContainer, accentSpec).value,
+    onErrorContainer = animateColorAsState(onErrorContainer, accentSpec).value,
+    outline = animateColorAsState(outline, surfaceSpec).value,
+    outlineVariant = animateColorAsState(outlineVariant, surfaceSpec).value,
+    scrim = animateColorAsState(scrim, surfaceSpec).value,
+    surfaceBright = animateColorAsState(surfaceBright, surfaceSpec).value,
+    surfaceDim = animateColorAsState(surfaceDim, surfaceSpec).value,
+    surfaceContainer = animateColorAsState(surfaceContainer, surfaceSpec).value,
+    surfaceContainerHigh = animateColorAsState(surfaceContainerHigh, surfaceSpec).value,
+    surfaceContainerHighest = animateColorAsState(surfaceContainerHighest, surfaceSpec).value,
+    surfaceContainerLow = animateColorAsState(surfaceContainerLow, surfaceSpec).value,
+    surfaceContainerLowest = animateColorAsState(surfaceContainerLowest, surfaceSpec).value,
+)
