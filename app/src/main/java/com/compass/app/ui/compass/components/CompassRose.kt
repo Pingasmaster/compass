@@ -53,8 +53,8 @@ import androidx.compose.ui.graphics.Path as ComposePath
 @Composable
 fun CompassRose(
     azimuthDegrees: Float,
-    modifier: Modifier = Modifier,
     isDark: Boolean,
+    modifier: Modifier = Modifier,
     calibrating: Boolean = false,
     targetAngle: Float? = null,
     targetColor: Color = MaterialTheme.colorScheme.tertiary,
