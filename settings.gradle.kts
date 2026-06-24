@@ -22,3 +22,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "Compass"
 include(":app")
+include(":baselineprofile")
+include(":macrobenchmark")
