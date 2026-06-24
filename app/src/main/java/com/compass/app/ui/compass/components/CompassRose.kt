@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -299,6 +300,7 @@ private fun DrawScope.drawTicks(centerX: Float, centerY: Float, outerRadius: Flo
     }
 }
 
+@Immutable
 internal data class CardinalMarker(val label: String, val angle: Float, val main: Boolean)
 
 internal val CardinalMarkers: List<CardinalMarker> = listOf(

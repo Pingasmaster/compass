@@ -13,8 +13,8 @@ android {
         applicationId = "com.compass.app"
         minSdk = 31
         targetSdk = 37
-        versionCode = 23
-        versionName = "1.0.22"
+versionCode = 24
+        versionName = "1.0.23"
     }
 
     buildTypes {
@@ -41,6 +41,16 @@ android {
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
         }
+    }
+
+    // Strong skipping mode: Compose treats @Stable/@Immutable annotated classes AND
+    // inferred-stable classes (val-only data classes with primitive/String properties)
+    // as skippable, eliminating redundant recompositions even when inference falls back
+    // to the conservative 'unstable' default. See:
+    // https://developer.android.com/develop/ui/compose/performance/bestpractices
+    composeCompiler {
+        @Suppress("DEPRECATION")
+        enableStrongSkippingMode = true
     }
 
     buildFeatures {
@@ -109,6 +119,10 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)
+
+    // LeakCanary is debug-only; R8 strips it from release builds. Auto-installs via
+    // AppStartup so no manual wiring needed.
+    debugImplementation(libs.leakcanary.android)
 
     detektPlugins(libs.detekt.compose)
     lintChecks(libs.lint.slack.checks)
