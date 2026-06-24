@@ -8,8 +8,9 @@ plugins {
     // lambdas is never inferred. This is the test-module equivalent of the
     // project's `app/build.gradle.kts` "Known Non-Bug #1": there, the duplicate
     // is fatal because `kotlin.compose` already registered the extension; here
-    // no such conflict exists.
-    alias(libs.plugins.kotlin.android)
+    // no such conflict exists. We omit `version` because the plugin is already
+    // on the buildscript classpath via the root `plugins { ... apply false }`.
+    id("org.jetbrains.kotlin.android")
 }
 
 android {
