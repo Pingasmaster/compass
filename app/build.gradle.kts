@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ktlint)
     alias(libs.plugins.detekt)
+    alias(libs.plugins.androidx.baselineprofile)
 }
 
 android {
@@ -117,6 +118,11 @@ dependencies {
     implementation(libs.datastore.preferences)
     implementation(libs.coroutines.android)
 
+    // Profile installer is what ships the baseline + startup profiles baked into the
+    // release AAB. At install / first launch it copies the profiles from the APK
+    // into the profile-cache dir that the OS reads when compiling DEX.
+    implementation(libs.androidx.profileinstaller)
+
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)
 
@@ -127,4 +133,14 @@ dependencies {
     detektPlugins(libs.detekt.compose)
     lintChecks(libs.lint.slack.checks)
     lintChecks(libs.lint.slack.compose)
+}
+
+// Baseline + startup profiles are regenerated automatically on every release build
+// by the :baselineprofile module (which runs on the pixel6Api33 managed device via
+// the GMD job in .github/workflows/baseline-profile.yml). saveInSrc writes the
+// regenerated baseline-prof.txt + startup-prof.txt into app/src/release/generated/
+// so they ship inside the release AAB.
+baselineProfile {
+    automaticGenerationDuringBuild = true
+    saveInSrc = true
 }

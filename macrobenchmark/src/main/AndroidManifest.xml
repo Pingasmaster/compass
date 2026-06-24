@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <queries>
+        <package android:name="com.compass.app" />
+    </queries>
+
+    <application
+        android:profileable="true"
+        tools:targetApi="33"
+        tools:ignore="UnusedAttribute" />
+
+</manifest>
