@@ -13,7 +13,7 @@ android {
         applicationId = "com.compass.app"
         minSdk = 31
         targetSdk = 37
-versionCode = 24
+        versionCode = 24
         versionName = "1.0.23"
     }
 
