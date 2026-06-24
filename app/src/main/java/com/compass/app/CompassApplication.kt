@@ -1,7 +1,10 @@
 package com.compass.app
 
+import android.app.ActivityManager
 import android.app.Application
+import android.app.ApplicationExitInfo
 import android.content.ComponentCallbacks2
+import android.util.Log
 import com.compass.app.data.preferences.UserPreferences
 
 class CompassApplication : Application() {
@@ -11,7 +14,40 @@ class CompassApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // Wire StrictMode policies in debug builds to surface main-thread disk/network
+        // calls and leaked Closeables/Activities during development. Must run before any
+        // UI-thread work so the Looper's violation handler is in place for early calls.
+        StrictModeBootstrap.init(this)
         userPreferences = UserPreferences(this)
+        // Capture previous-process exit reasons on this launch so ANRs, OOMs, and native
+        // crashes that happened while the app was dead become visible in logcat instead
+        // of just "process died" with no diagnostic. minSdk=31 ≥ API 30 (ApplicationExitInfo
+        // added in API 30) so no runtime SDK gate is required.
+        capturePreviousExitReasons()
+    }
+
+    private fun capturePreviousExitReasons() {
+        val am = getSystemService(ActivityManager::class.java) ?: return
+        try {
+            am.getHistoricalProcessExitReasons(packageName, android.os.Process.myPid(), MAX_EXIT_REASONS)
+                .filter { it.reason != ApplicationExitInfo.REASON_OTHER }
+                .filter { it.reason != ApplicationExitInfo.REASON_EXIT_SELF }
+                .forEach { info ->
+                    Log.w(
+                        TAG,
+                        "previous exit reason=${info.reason} importance=${info.importance} " +
+                            "pss=${info.pss} rss=${info.rss} description=${info.description}",
+                    )
+                }
+        } catch (_: SecurityException) {
+            // Defensive: never let diagnostics crash app startup. SecurityException is
+            // the only checked-like failure mode the ActivityManager API can throw here
+            // (process gone, permission flip mid-call). Other Throwables are intentionally
+            // not swallowed — they'd indicate a programming bug worth surfacing.
+            Log.w(TAG, "getHistoricalProcessExitReasons denied")
+        } catch (e: IllegalArgumentException) {
+            Log.w(TAG, "getHistoricalProcessExitReasons invalid args", e)
+        }
     }
 
     /**
@@ -30,5 +66,12 @@ class CompassApplication : Application() {
             ComponentCallbacks2.TRIM_MEMORY_BACKGROUND,
             -> Unit
         }
+    }
+
+    private companion object {
+        // ActivityManager.getHistoricalProcessExitReasons caps how far back it scans;
+        // 10 is enough to catch the most recent ANR/OOM cluster without burning memory.
+        const val TAG = "CompassApplication"
+        const val MAX_EXIT_REASONS = 10
     }
 }
