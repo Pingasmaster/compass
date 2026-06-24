@@ -7,8 +7,9 @@
     </queries>
 
     <application
-        android:profileable="true"
         tools:targetApi="33"
-        tools:ignore="UnusedAttribute" />
+        tools:ignore="UnusedAttribute">
+        <profileable android:shell="true" />
+    </application>
 
 </manifest>
