@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+      Baseline Profile producer module. The application tag is required for
+      com.android.test modules, but it is not installed as an app — it only
+      exists to host the AndroidJUnit4 test runner. The <profileable> child
+      element enables the BaselineProfileRule to capture profiles without
+      requiring the target app to be debuggable.
+    -->
+    <application tools:targetApi="33">
+        <profileable android:shell="true" />
+    </application>
+
+</manifest>
