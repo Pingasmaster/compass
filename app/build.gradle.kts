@@ -66,9 +66,6 @@ android {
         checkReleaseBuilds = true
         explainIssues = true
         showAll = true
-        htmlReport = true
-        xmlReport = true
-        sarifReport = true
         baseline = file("lint-baseline.xml")
         lintConfig = rootProject.file("config/lint/lint.xml")
     }
