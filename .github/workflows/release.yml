@@ -9,6 +9,13 @@ permissions:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  # Gradle 9.6.0 introduced --non-interactive / GRADLE_NON_INTERACTIVE.
+  # Prevents interactive prompts from breaking the CI build.
+  GRADLE_NON_INTERACTIVE: "true"
+  # NO_COLOR=1 honored by Gradle 9.6.0 — suppresses ANSI escape codes
+  # while preserving bold/underline/animations. Downstream log parsing
+  # and AI agent consumption benefit.
+  NO_COLOR: "1"
 
 jobs:
   build:
@@ -28,7 +35,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v6.1.0
 
       - name: Build release APK
-        run: ./gradlew assembleRelease
+        run: ./gradlew --non-interactive assembleRelease
 
       - name: Upload APK to GitHub Release
         uses: softprops/action-gh-release@v3.0.0
