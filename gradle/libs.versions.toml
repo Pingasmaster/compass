@@ -1,6 +1,7 @@
 [versions]
 agp = "9.2.1"
 kotlin-compose = "2.3.21"
+leakcanary = "2.14"
 
 # The Compose BOM pins every androidx.compose.* artefact. The explicit
 # `compose` version was removed — let the BOM be the single source of truth
@@ -50,6 +51,8 @@ coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutin
 
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
+
+leakcanary-android = { group = "com.squareup.leakcanary", name = "leakcanary-android", version.ref = "leakcanary" }
 
 detekt-compose = { module = "io.nlopez.compose.rules:detekt", version.ref = "compose-rules" }
 lint-slack-checks = { module = "com.slack.lint:slack-lint-checks", version.ref = "slack-lint-checks" }
