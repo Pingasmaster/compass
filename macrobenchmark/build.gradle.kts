@@ -1,5 +1,15 @@
 plugins {
     id("com.android.test")
+    // The :macrobenchmark module hosts .kt files but does NOT apply
+    // `kotlin.compose` (no Compose runtime here), so the Kotlin Android plugin
+    // is not auto-applied and `:macrobenchmark:compileDebugKotlin` would fail
+    // with "Unresolved reference 'pressHome' / 'startActivityAndWait' / 'device'"
+    // because the `MacrobenchmarkScope` receiver on `setupBlock` / `measureBlock`
+    // lambdas is never inferred. This is the test-module equivalent of the
+    // project's `app/build.gradle.kts` "Known Non-Bug #1": there, the duplicate
+    // is fatal because `kotlin.compose` already registered the extension; here
+    // no such conflict exists.
+    alias(libs.plugins.kotlin.android)
 }
 
 android {
@@ -13,9 +23,8 @@ android {
         targetCompatibility = JavaVersion.VERSION_21
     }
 
-    buildFeatures {
-        // Kotlin support is built into AGP 9.0+; no separate plugin needed.
-        buildConfig = false
+    kotlin {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
     }
 }
 
