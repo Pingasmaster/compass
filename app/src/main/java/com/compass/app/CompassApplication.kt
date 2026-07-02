@@ -57,13 +57,24 @@ class CompassApplication : Application() {
      * TRIM_MEMORY_BACKGROUND. The compass app holds no significant
      * in-memory caches (DataStore-backed UserPreferences is cheap to
      * re-read), so the override is the canonical landing pad for future
-     * trim hooks.
+     * trim hooks. Remaining trim levels are listed explicitly to satisfy
+     * SwitchIntDef lint — they remain no-ops. The remaining levels are
+     * marked @Deprecated in the platform since API 35 but are still part
+     * of the @IntDef that SwitchIntDef validates against.
      */
+    @Suppress("DEPRECATION")
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         when (level) {
             ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN,
             ComponentCallbacks2.TRIM_MEMORY_BACKGROUND,
+            -> Unit
+
+            ComponentCallbacks2.TRIM_MEMORY_COMPLETE,
+            ComponentCallbacks2.TRIM_MEMORY_MODERATE,
+            ComponentCallbacks2.TRIM_MEMORY_RUNNING_CRITICAL,
+            ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW,
+            ComponentCallbacks2.TRIM_MEMORY_RUNNING_MODERATE,
             -> Unit
         }
     }

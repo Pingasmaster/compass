@@ -14,6 +14,13 @@ android {
 
     targetProjectPath = ":app"
 
+    // Required by leakcanary-android-core (>=3.0-alpha-9), which ships an
+    // adaptive-icon launcher resource. Adaptive icons need API 26+. The
+    // benchmark module's default minSdk (1) rejects it at resource link.
+    defaultConfig {
+        minSdk = 26
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
