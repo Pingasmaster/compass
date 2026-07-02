@@ -32,12 +32,12 @@ jobs:
           java-version: 21
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6.1.0
+        uses: gradle/actions/setup-gradle@v6.2.0
 
       - name: Build release APK
         run: ./gradlew --non-interactive assembleRelease
 
       - name: Upload APK to GitHub Release
-        uses: softprops/action-gh-release@v3.0.0
+        uses: softprops/action-gh-release@v3.0.1
         with:
           files: app/build/outputs/apk/release/app-release.apk
