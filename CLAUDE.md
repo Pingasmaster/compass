@@ -6,4 +6,4 @@ NO NON-ASCII CHARACTERS ALLOWED. Em-dashes, fancy quotes, and all other non-ASCI
 
 ## Git workflow
 
-Always commit and push on main once done.
+Always commit and push on master once done. This repo's default branch is `master`. When working in a worktree, fast-forward the worktree branch into master and push `origin/master`, then remove the worktree — do not open a PR.
