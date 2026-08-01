@@ -23,16 +23,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        # v6.1.0 was a non-existent tag; the v6 series only goes up to
-        # v6.0.3 on actions/checkout. Pin to the real latest within v6
-        # instead of crossing majors to v7.
-        uses: actions/checkout@v6.0.3
+        uses: actions/checkout@v6.1.0
 
       - name: Set up JDK 21
-        # v6.0.0 was a non-existent tag; there is no v6 series on
-        # actions/setup-java at all (v5.4.0 is the latest). Pin to v5.4.0
-        # instead of inventing a tag that would not resolve.
-        uses: actions/setup-java@v5.4.0
+        uses: actions/setup-java@v5.7.0
         with:
           distribution: temurin
           java-version: 21
@@ -44,6 +38,6 @@ jobs:
         run: ./gradlew --non-interactive assembleRelease
 
       - name: Upload APK to GitHub Release
-        uses: softprops/action-gh-release@v3.0.1
+        uses: softprops/action-gh-release@v3.0.2
         with:
           files: app/build/outputs/apk/release/app-release.apk

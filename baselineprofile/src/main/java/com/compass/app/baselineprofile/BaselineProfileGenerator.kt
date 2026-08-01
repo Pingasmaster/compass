@@ -23,7 +23,7 @@ import org.junit.runner.RunWith
  * start. We still drive it explicitly in [grant_location_permission] so the system
  * permission dialog action is recorded in the profile.
  *
- * Pixel 6 / API 33 GMD only — see build.gradle.kts.
+ * Pixel 7a / API 37 GMD only — see build.gradle.kts.
  */
 @RunWith(AndroidJUnit4::class)
 class BaselineProfileGenerator {

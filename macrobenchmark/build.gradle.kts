@@ -25,6 +25,17 @@ android {
         sourceCompatibility = JavaVersion.VERSION_21
         targetCompatibility = JavaVersion.VERSION_21
     }
+
+    testOptions.managedDevices.localDevices {
+        // Same GMD as :baselineprofile / dustvalve_next.
+        register("pixel7aApi37") {
+            device = "Pixel 7a"
+            apiLevel = 37
+            systemImageSource = "google"
+            pageAlignment = com.android.build.api.dsl.ManagedVirtualDevice.PageAlignment.FORCE_16KB_PAGES
+            testedAbi = "arm64-v8a"
+        }
+    }
 }
 
 dependencies {

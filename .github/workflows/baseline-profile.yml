@@ -13,12 +13,12 @@ permissions:
 
 jobs:
   baseline-profile:
-    name: Generate Baseline + Startup Profile (release, API 33)
+    name: Generate Baseline + Startup Profile (release, Pixel 7a / API 37)
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - name: Checkout
-        uses: actions/checkout@v4.3.1
+        uses: actions/checkout@v6.1.0
         with:
           fetch-depth: 0
 
@@ -31,37 +31,40 @@ jobs:
           ls -la /dev/kvm
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v5.4.0
+        uses: actions/setup-java@v5.7.0
         with:
           distribution: 'zulu'
           java-version: 17
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3.2.2
+        uses: android-actions/setup-android@v4.0.1
 
       - name: Accept SDK licenses
         run: yes | sdkmanager --licenses || true
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4.4.4
+        uses: gradle/actions/setup-gradle@v6.2.0
 
-      - name: Setup GMD (Pixel 6, API 33, AOSP)
+      - name: Setup GMD (Pixel 7a, API 37, 16 KB pages, arm64-v8a)
         run: >-
-          ./gradlew :baselineprofile:pixel6Api33Setup --info
+          ./gradlew :baselineprofile:pixel7aApi37Setup --info
           -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
 
       - name: Generate Baseline + Startup Profile
+        # Explicit GMD test — automaticGenerationDuringBuild is off on :app,
+        # so assembleRelease alone would not collect profiles. The producer
+        # variant is nonMinifiedRelease (baselineprofile plugin default).
         run: >-
-          ./gradlew :app:assembleRelease
+          ./gradlew :baselineprofile:pixel7aApi37NonMinifiedReleaseAndroidTest
           -Pandroid.testInstrumentationRunnerArguments.androidx.benchmark.enabledRules=baselineprofile
           -Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect
 
       - name: Open PR with regenerated profiles
-        uses: peter-evans/create-pull-request@v6.1.0
+        uses: peter-evans/create-pull-request@v8.1.1
         with:
           branch: bot/baseline-profile-regen
           title: "chore(baseline-profile): regenerate baseline-prof.txt + startup-prof.txt"
-          commit-message: "chore(baseline-profile): regenerate from API 33 / Pixel 6"
+          commit-message: "chore(baseline-profile): regenerate from API 37 / Pixel 7a"
           body: |
             Automated regeneration via the baseline-profile CI workflow.
             See app/src/release/generated/baselineProfiles/ for the diff.

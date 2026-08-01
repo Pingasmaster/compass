@@ -19,10 +19,14 @@ android {
     }
 
     testOptions.managedDevices.localDevices {
-        create("pixel6Api33") {
-            device = "Pixel 6"
-            apiLevel = 33
-            systemImageSource = "aosp"
+        // Match dustvalve_next: Pixel 7a / API 37 Google APIs / 16 KB pages,
+        // testing the arm64 APK via the image's translation layer (AGP 10 default).
+        register("pixel7aApi37") {
+            device = "Pixel 7a"
+            apiLevel = 37
+            systemImageSource = "google"
+            pageAlignment = com.android.build.api.dsl.ManagedVirtualDevice.PageAlignment.FORCE_16KB_PAGES
+            testedAbi = "arm64-v8a"
         }
     }
 
@@ -50,7 +54,7 @@ dependencies {
 
 // Wire the producer module to the GMD device declared in testOptions above.
 baselineProfile {
-    managedDevices += "pixel6Api33"
+    managedDevices += "pixel7aApi37"
     useConnectedDevices = false
 }
 
