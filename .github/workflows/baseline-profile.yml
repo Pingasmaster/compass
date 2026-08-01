@@ -11,6 +11,11 @@ permissions:
   contents: write
   pull-requests: write
 
+env:
+  # JDK 25: silence JEP 498 (Unsafe) + JEP 472 (native access) warnings from
+  # the Gradle client JVM and forked workers (ktlint / Kotlin compiler).
+  JAVA_TOOL_OPTIONS: "--sun-misc-unsafe-memory-access=allow --enable-native-access=ALL-UNNAMED"
+
 jobs:
   baseline-profile:
     name: Generate Baseline + Startup Profile (release, Pixel 7a / API 37)
@@ -30,11 +35,14 @@ jobs:
           sudo udevadm trigger --name-match=kvm
           ls -la /dev/kvm
 
-      - name: Set up JDK 17
+      - name: Set up JDK 25
         uses: actions/setup-java@v5.7.0
         with:
           distribution: 'zulu'
-          java-version: 17
+          java-version: 25
+
+      - name: Wrap JDK 25 for Gradle workers
+        run: source scripts/ensure-jdk25-home.sh && echo "JAVA_HOME=$JAVA_HOME" >> "$GITHUB_ENV" && echo "$JAVA_HOME/bin" >> "$GITHUB_PATH"
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v4.0.1

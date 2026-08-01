@@ -21,6 +21,28 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# Prefer a real JDK 25, then wrap it so Gradle Worker Daemons (ktlint) also
+# get the JEP 498 / JEP 472 opt-in flags. Workers use the daemon's java
+# executable by absolute path and ignore JAVA_TOOL_OPTIONS / org.gradle.jvmargs.
+if [[ -z "${JAVA_HOME:-}" || "${JAVA_HOME}" == "${SCRIPT_DIR}/.jdk25-home" ]]; then
+    unset JAVA_HOME
+    for candidate in \
+        /usr/lib/jvm/java-25-openjdk-amd64 \
+        /usr/lib/jvm/java-25-openjdk \
+        "$HOME/.jdks/jdk-25"; do
+        if [[ -x "$candidate/bin/java" ]]; then
+            export JAVA_HOME="$candidate"
+            break
+        fi
+    done
+fi
+# shellcheck source=scripts/ensure-jdk25-home.sh
+source "$SCRIPT_DIR/scripts/ensure-jdk25-home.sh"
+
+# Also export for any forked JVM that does honor JAVA_TOOL_OPTIONS (client
+# launcher, Kotlin compile daemon children outside the worker pool).
+export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:+$JAVA_TOOL_OPTIONS }--sun-misc-unsafe-memory-access=allow --enable-native-access=ALL-UNNAMED"
+
 # Any build.sh invocation stops a leftover one-shot APK HTTP serve from a
 # previous successful build (also stopped by first download or 10 min timeout).
 ./scripts/apk_http_serve.sh stop || true

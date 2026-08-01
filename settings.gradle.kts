@@ -1,7 +1,7 @@
 // Compass — settings.gradle.kts
 //
 // Modernized for Gradle 9.6.0:
-//   - foojay-resolver-convention: JDK 17+ toolchain auto-provisioning (AGP 9.x requirement)
+//   - foojay-resolver-convention: JDK toolchain auto-provisioning (daemon JVM 25)
 //   - enableFeaturePreview("NO_IMPLICIT_LOOKUP_IN_PARENT_PROJECTS"): adopt Gradle 10 behavior
 //     (eliminates implicit project.properties() / findProperty() / hasProperty() lookups in
 //     parent projects — see https://docs.gradle.org/9.6.0/userguide/upgrading_version_9.html)
@@ -23,8 +23,8 @@ pluginManagement {
 }
 
 plugins {
-    // JDK 17+ toolchain auto-provisioning. Required by AGP 9.x.
-    // Stable since 0.9.0 (2024); 1.0.0 ships with 9.6.0.
+    // JDK toolchain auto-provisioning for gradle-daemon-jvm.properties (JDK 25).
+    // Stable since 0.9.0 (2024); 1.0.0 ships with Gradle 9.6.0.
     id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 

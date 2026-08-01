@@ -14,8 +14,8 @@ android {
         applicationId = "com.compass.app"
         minSdk = 31
         targetSdk = 37
-        versionCode = 28
-        versionName = "1.0.27"
+        versionCode = 32
+        versionName = "1.0.31"
     }
 
     buildTypes {
@@ -34,13 +34,13 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
+        sourceCompatibility = JavaVersion.VERSION_25
+        targetCompatibility = JavaVersion.VERSION_25
     }
 
     kotlin {
         compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_25)
         }
     }
 

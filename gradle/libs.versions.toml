@@ -42,8 +42,8 @@ dependency-analysis = "3.18.0"
 # See https://github.com/gradle/gradle/issues/37947
 slf4j = "2.0.18"
 
-# JDK toolchain target. AGP 9.x requires JDK 17+; we use 21 to match JDK 21.
-jvmTarget = "21"
+# JDK toolchain target. AGP 9.x requires JDK 17+; we build and run on JDK 25.
+jvmTarget = "25"
 
 [libraries]
 compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "compose-bom" }
