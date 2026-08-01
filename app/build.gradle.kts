@@ -14,8 +14,8 @@ android {
         applicationId = "com.compass.app"
         minSdk = 31
         targetSdk = 37
-        versionCode = 32
-        versionName = "1.0.31"
+        versionCode = 34
+        versionName = "1.0.33"
     }
 
     buildTypes {
