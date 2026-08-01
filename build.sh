@@ -2,9 +2,14 @@
 #
 # Usage:
 #   ./build.sh                    # clean + ktlintCheck + detekt + lintRelease + test + assemble + bump version
+#                                 # then one-shot NetBird APK HTTP serve at :8765/app-release.apk
 #   ./build.sh --clean            # gradle clean + remove APK + exit
 #   ./build.sh --format           # ktlintFormat + exit (no build)
 #   ./build.sh --build-health     # full build + dependency-analysis buildHealth report
+#
+# After a successful full build, scripts/apk_http_serve.sh publishes
+# http://<netbird-fqdn>:8765/app-release.apk until the first complete download,
+# 10 minutes, or the next ./build.sh invocation - whichever happens first.
 #
 # IMPORTANT: Do NOT manually remove .build.lock unless you have user approval
 # and have confirmed no process is currently using it (check with `fuser
@@ -15,6 +20,10 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
+
+# Any build.sh invocation stops a leftover one-shot APK HTTP serve from a
+# previous successful build (also stopped by first download or 10 min timeout).
+./scripts/apk_http_serve.sh stop || true
 
 # Argument parsing
 DO_CLEAN_ONLY=0
@@ -86,6 +95,9 @@ fi
 rm -f "$ROOT_APK"
 cp "$GRADLE_APK" "$ROOT_APK"
 echo "Copied release APK to $ROOT_APK"
+
+# One-shot NetBird sideload URL (first download / 10 min / next build.sh).
+./scripts/apk_http_serve.sh start "$ROOT_APK"
 
 # Always bump version
 CURRENT_CODE=$(sed -n 's/.*versionCode = \([0-9]*\).*/\1/p' "$BUILD_GRADLE")

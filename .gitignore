@@ -12,6 +12,8 @@ CLAUDE.md
 **/build/
 /captures/
 .build.lock
+.apk-http-serve.pid
+.apk-http-serve.log
 /out/
 /app/out/
 
