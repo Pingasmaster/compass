@@ -34,10 +34,9 @@ class ScrollBenchmarks {
     fun scrollNone() = benchmark(CompilationMode.None())
 
     @Test
-    fun scrollBaselineProfile() =
-        benchmark(
-            CompilationMode.Partial(baselineProfileMode = BaselineProfileMode.Require),
-        )
+    fun scrollBaselineProfile() = benchmark(
+        CompilationMode.Partial(baselineProfileMode = BaselineProfileMode.Require),
+    )
 
     private fun benchmark(compilationMode: CompilationMode) {
         rule.measureRepeated(

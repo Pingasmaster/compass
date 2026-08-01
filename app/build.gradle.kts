@@ -1,7 +1,6 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.ktlint)
     alias(libs.plugins.detekt)
     alias(libs.plugins.androidx.baselineprofile)
 }
@@ -14,8 +13,8 @@ android {
         applicationId = "com.compass.app"
         minSdk = 31
         targetSdk = 37
-        versionCode = 34
-        versionName = "1.0.33"
+        versionCode = 36
+        versionName = "1.0.35"
     }
 
     buildTypes {
@@ -62,19 +61,6 @@ android {
         showAll = true
         baseline = file("lint-baseline.xml")
         lintConfig = rootProject.file("config/lint/lint.xml")
-    }
-}
-
-ktlint {
-    version.set(libs.versions.ktlint.engine.get())
-    android.set(true)
-    ignoreFailures.set(false)
-    filter {
-        exclude { it.file.path.contains("/build/") }
-    }
-    reporters {
-        reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.PLAIN)
-        reporter(org.jlleitschuh.gradle.ktlint.reporter.ReporterType.SARIF)
     }
 }
 
