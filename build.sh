@@ -3,7 +3,7 @@
 # Usage:
 #   ./build.sh                    # bump version + clean + ASCII + ktlint + detekt + lint
 #                                 # + tests + assemble harnesses + assemble APKs
-#                                 # then one-shot NetBird APK HTTP serve at :8765/app-release.apk
+#                                 # then one-shot NetBird APK HTTP serve for both APKs
 #                                 # (+ copy release mappings next to the APKs)
 #   ./build.sh --clean            # gradle clean + remove APKs + exit
 #   ./build.sh --format           # ktlintFormat + exit (no build)
@@ -12,13 +12,12 @@
 #   ./build.sh --smoke-shipped    # :shippedsmoke release lane (future)
 #   ./build.sh --baseline-profile # regenerate baseline profiles via GMD (future)
 #   ./build.sh --macrobenchmark   # advisory emulator macrobenchmarks (future)
-#   ./build.sh --publish          # serve existing root APK over NetBird HTTP + exit
+#   ./build.sh --publish          # serve existing root APKs over NetBird HTTP + exit
 #
-# After a successful full build, scripts/apk_http_serve.sh publishes
-# http://<netbird-fqdn>:8765/app-release.apk until the first complete download,
-# 10 minutes, or the next ./build.sh invocation - whichever happens first.
-# That URL serves the compat (Android 8+) APK; app-release-future.apk is
-# also copied to the repo root for Android 17 devices.
+# After a successful full build, scripts/apk_http_serve.sh publishes both
+# http://<netbird-fqdn>:8765/app-release.apk (compat, Android 8+) and
+# http://<netbird-fqdn>:8765/app-release-future.apk (future, Android 17) until
+# both are downloaded once, 10 minutes, or the next ./build.sh invocation.
 #
 # IMPORTANT: Do NOT manually remove the global Android-apps build lock unless
 # you have user approval and have confirmed no process is using it (check with
@@ -100,7 +99,7 @@ GMD_GPU=(-Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect)
 SMOKE_ANNOTATION="com.compass.app.testing.SmokeTest"
 
 if [[ "$DO_PUBLISH" -eq 1 ]]; then
-    ./scripts/apk_http_serve.sh start "$ROOT_APK"
+    ./scripts/apk_http_serve.sh start "$ROOT_APK" "$ROOT_APK_FUTURE"
     exit 0
 fi
 
@@ -242,5 +241,5 @@ if [[ -f "$GRADLE_MAPPING_FUTURE" ]]; then
     echo "Copied future release mapping to $ROOT_MAPPING_FUTURE"
 fi
 
-# Serve the compat APK by default (Android 8+ download for the existing URL).
-./scripts/apk_http_serve.sh start "$ROOT_APK"
+# Serve both flavor APKs (compat + future).
+./scripts/apk_http_serve.sh start "$ROOT_APK" "$ROOT_APK_FUTURE"
