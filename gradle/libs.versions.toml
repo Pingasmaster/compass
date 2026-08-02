@@ -1,5 +1,6 @@
 [versions]
 agp = "9.4.0-alpha07"
+desugar-jdk-libs = "2.1.5"
 kotlin-compose = "2.4.10"
 leakcanary = "3.0-alpha-9"
 
@@ -50,6 +51,9 @@ slf4j = "2.0.18"
 jvmTarget = "25"
 
 [libraries]
+# Core library desugaring (compat flavor: minSdk 26 + JVM 25 bytecode)
+desugar-jdk-libs = { group = "com.android.tools", name = "desugar_jdk_libs", version.ref = "desugar-jdk-libs" }
+
 compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "compose-bom" }
 compose-runtime = { group = "androidx.compose.runtime", name = "runtime" }
 compose-ui = { group = "androidx.compose.ui", name = "ui" }

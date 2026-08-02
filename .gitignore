@@ -62,3 +62,5 @@ hs_err_pid*.log
 # Generated icon/script temp files
 /scripts/*.tmp
 app-release-mapping.txt
+app-release-mapping.txt
+app-release-future-mapping.txt

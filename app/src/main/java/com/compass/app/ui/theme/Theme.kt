@@ -14,12 +14,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import com.compass.app.util.isAtLeastS
 
 /**
  * Compass theme.
  *
- * - Dynamic color on API 31+ (the compass app's minSdk), with the seeded
- *   fallback scheme when dynamic is disabled.
+ * - Dynamic color on API 31+ (gated via [isAtLeastS]), with the seeded
+ *   fallback scheme when dynamic is disabled or unavailable.
  * - Colours animate on theme/scheme change with a two-speed spec:
  *   accent slots fade fast, surface/background slots fade slowly so a
  *   light <-> dark flip doesn't flash.
@@ -38,7 +39,9 @@ fun CompassTheme(
     content: @Composable () -> Unit,
 ) {
     val colorScheme = when {
-        dynamicColor -> {
+        // Material You dynamic color needs API 31+; older devices fall
+        // through to the static schemes below.
+        dynamicColor && isAtLeastS() -> {
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }

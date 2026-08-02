@@ -15,8 +15,17 @@ android {
     experimentalProperties["android.experimental.self-instrumenting"] = true
 
     defaultConfig {
-        minSdk = 31
+        minSdk = 37
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // :app has an api flavor dimension; always exercise the future APK.
+        missingDimensionStrategy("api", "future")
+    }
+
+    flavorDimensions += "api"
+    productFlavors {
+        create("future") {
+            dimension = "api"
+        }
     }
 
     buildTypes {

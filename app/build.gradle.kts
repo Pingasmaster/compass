@@ -9,13 +9,35 @@ android {
     namespace = "com.compass.app"
     compileSdk = 37
 
+    // Shared by defaultConfig + future flavor offset. build.sh bumps this
+    // via sed; future re-reads it on the next Gradle configure.
+    val baseVersionCode = 38
+    val baseVersionName = "1.0.37"
+
     defaultConfig {
         applicationId = "com.compass.app"
-        minSdk = 31
         targetSdk = 37
-        versionCode = 37
-        versionName = "1.0.36"
+        versionCode = baseVersionCode
+        versionName = baseVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    // Single codebase, two APKs: compat (Android 8+) and future (Android 17+).
+    flavorDimensions += "api"
+    productFlavors {
+        create("compat") {
+            dimension = "api"
+            minSdk = 26
+            versionNameSuffix = "-legacy"
+            // Uses defaultConfig.versionCode so an Android 17 user who
+            // somehow installed compat can still upgrade to future.
+        }
+        create("future") {
+            dimension = "api"
+            minSdk = 37
+            // Higher than compat so sideload/Play prefer this on API 37+.
+            versionCode = 1_000_000 + baseVersionCode
+        }
     }
 
     buildTypes {
@@ -36,6 +58,9 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_25
         targetCompatibility = JavaVersion.VERSION_25
+        // Required for compat (minSdk 26 + JVM 25). Harmless no-op on future
+        // for APIs already present on Android 17; R8 strips unused bits.
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlin {
@@ -88,6 +113,8 @@ detekt {
 }
 
 dependencies {
+    coreLibraryDesugaring(libs.desugar.jdk.libs)
+
     val composeBom = platform(libs.compose.bom)
     implementation(composeBom)
 

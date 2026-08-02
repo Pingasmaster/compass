@@ -18,10 +18,19 @@ android {
 
     // Required by leakcanary-android-core (>=3.0-alpha-9), which ships an
     // adaptive-icon launcher resource. Adaptive icons need API 26+. The
-    // benchmark module's default minSdk (1) rejects it at resource link.
+    // harness exercises the future flavor (minSdk 37) on GMD API 37.
     defaultConfig {
-        minSdk = 26
+        minSdk = 37
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // :app has an api flavor dimension; always exercise the future APK.
+        missingDimensionStrategy("api", "future")
+    }
+
+    flavorDimensions += "api"
+    productFlavors {
+        create("future") {
+            dimension = "api"
+        }
     }
 
     buildTypes {

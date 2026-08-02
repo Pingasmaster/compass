@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Pre-Android 12 fullBackupContent rules (API 26-30). Mirrors
+    data_extraction_rules.xml: only DataStore preferences travel.
+-->
+<full-backup-content>
+    <include domain="file" path="datastore/" />
+</full-backup-content>

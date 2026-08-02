@@ -4,8 +4,10 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
+import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
+import android.os.Bundle
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
@@ -92,10 +94,22 @@ class CompassViewModel(val prefs: UserPreferences, appContext: Context, private 
         if (!manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) return
         stopLocationUpdates()
         val provider = LocationManager.NETWORK_PROVIDER
-        // LocationListener gained default implementations for onStatusChanged,
-        // onProviderEnabled and onProviderDisabled in API 29, so on minSdk 31 we
-        // only need to override onLocationChanged.
-        val listener = LocationListener { location -> sensor.updateLocation(location) }
+        // LocationListener default methods for onStatusChanged /
+        // onProviderEnabled / onProviderDisabled landed in API 29. Compat
+        // runs on API 26-28, so implement all callbacks to avoid
+        // AbstractMethodError when the framework invokes them.
+        val listener = object : LocationListener {
+            override fun onLocationChanged(location: Location) {
+                sensor.updateLocation(location)
+            }
+
+            @Deprecated("Deprecated in Java")
+            override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) = Unit
+
+            override fun onProviderEnabled(provider: String) = Unit
+
+            override fun onProviderDisabled(provider: String) = Unit
+        }
         locationListener = listener
         manager.getLastKnownLocation(provider)?.let(sensor::updateLocation)
         manager.requestLocationUpdates(

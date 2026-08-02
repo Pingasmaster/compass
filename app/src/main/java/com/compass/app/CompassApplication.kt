@@ -6,6 +6,7 @@ import android.app.ApplicationExitInfo
 import android.content.ComponentCallbacks2
 import android.util.Log
 import com.compass.app.data.preferences.UserPreferences
+import com.compass.app.util.isAtLeastR
 
 class CompassApplication : Application() {
 
@@ -21,12 +22,18 @@ class CompassApplication : Application() {
         userPreferences = UserPreferences(this)
         // Capture previous-process exit reasons on this launch so ANRs, OOMs, and native
         // crashes that happened while the app was dead become visible in logcat instead
-        // of just "process died" with no diagnostic. minSdk=31 ? API 30 (ApplicationExitInfo
-        // added in API 30) so no runtime SDK gate is required.
+        // of just "process died" with no diagnostic. ApplicationExitInfo is API 30+;
+        // compat (minSdk 26) early-returns below R so class verification stays safe.
         capturePreviousExitReasons()
     }
 
+    /**
+     * ApplicationExitInfo accessors stay in this method (after [isAtLeastR])
+     * so NewApi lint sees the [androidx.annotation.ChecksSdkIntAtLeast] gate
+     * and ART never verifies exit-info bytecode on API 26-29.
+     */
     private fun capturePreviousExitReasons() {
+        if (!isAtLeastR()) return
         val am = getSystemService(ActivityManager::class.java) ?: return
         try {
             am.getHistoricalProcessExitReasons(packageName, android.os.Process.myPid(), MAX_EXIT_REASONS)

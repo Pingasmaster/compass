@@ -14,11 +14,20 @@ android {
     // The producer module pulls the full app classpath in via
     // `implementation(project(":app"))` (BaselineProfileRule.collect needs the
     // app's MainActivity on the classpath), which pushes the merged dex over
-    // the 64K method limit. minSdk=31 enables native multidex so we don't
-    // need the support-library multidex dependency.
+    // the 64K method limit. Native multidex covers that; minSdk matches the
+    // future flavor under test (API 37 GMD).
     defaultConfig {
-        minSdk = 31
+        minSdk = 37
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // :app has an api flavor dimension; always exercise the future APK.
+        missingDimensionStrategy("api", "future")
+    }
+
+    flavorDimensions += "api"
+    productFlavors {
+        create("future") {
+            dimension = "api"
+        }
     }
 
     buildTypes {
