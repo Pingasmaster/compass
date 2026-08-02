@@ -11,8 +11,8 @@ android {
 
     // Shared by defaultConfig + future flavor offset. build.sh bumps this
     // via sed; future re-reads it on the next Gradle configure.
-    val baseVersionCode = 38
-    val baseVersionName = "1.0.37"
+    val baseVersionCode = 39
+    val baseVersionName = "1.0.38"
 
     defaultConfig {
         applicationId = "com.compass.app"
