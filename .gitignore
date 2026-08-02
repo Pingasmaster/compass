@@ -46,7 +46,7 @@ Thumbs.db
 /app/release/
 /mapping/
 
-# Signing keys — never commit
+# Signing keys - never commit
 *.jks
 *.keystore
 .password-signing-keys

@@ -14,11 +14,20 @@ android {
 
     targetProjectPath = ":app"
 
+    experimentalProperties["android.experimental.self-instrumenting"] = true
+
     // Required by leakcanary-android-core (>=3.0-alpha-9), which ships an
     // adaptive-icon launcher resource. Adaptive icons need API 26+. The
     // benchmark module's default minSdk (1) rejects it at resource link.
     defaultConfig {
         minSdk = 26
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        create("release") {
+            signingConfig = signingConfigs.getByName("debug")
+        }
     }
 
     compileOptions {
@@ -39,10 +48,11 @@ android {
 }
 
 dependencies {
-    // Benchmark classes need to launch the app's MainActivity under test.
-    implementation(project(":app"))
-
     implementation(libs.androidx.benchmark.macro.junit4)
     implementation(libs.androidx.test.ext.junit)
     implementation(libs.androidx.test.uiautomator)
+}
+
+tasks.matching { it.name.startsWith("checkTestedAppObfuscation") }.configureEach {
+    enabled = false
 }

@@ -33,7 +33,7 @@ class MainActivity : ComponentActivity() {
 
             // Re-apply edge-to-edge whenever dark mode flips so the system bar
             // icon colour tracks the theme. enableEdgeToEdge is idempotent and
-            // has no teardown, so LaunchedEffect(isDark) is the right shape —
+            // has no teardown, so LaunchedEffect(isDark) is the right shape -
             // reserving DisposableEffect for effects that actually need cleanup.
             LaunchedEffect(isDark) {
                 val style = if (isDark) {

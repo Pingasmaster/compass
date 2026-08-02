@@ -5,7 +5,7 @@ import android.content.pm.ApplicationInfo
 import android.os.StrictMode
 
 /**
- * Wires StrictMode policies in debug builds. Catches regressions before they ship —
+ * Wires StrictMode policies in debug builds. Catches regressions before they ship -
  * a single `runOnUiThread { db.query() }` becomes a crash with stack trace during dev
  * instead of a Play-Console ANR.
  *

@@ -41,7 +41,7 @@ data class CompassReading(
     val hasSensor: Boolean = true,
 )
 
-// Cardinal abbreviations are kept in English by design — "N/E/S/W" is the
+// Cardinal abbreviations are kept in English by design - "N/E/S/W" is the
 // conventional compass notation across most locales this app targets, and
 // localising them would mismatch the rose letters drawn by CompassRose.
 fun Float.toCardinal(): String {

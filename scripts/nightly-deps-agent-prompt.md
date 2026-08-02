@@ -1,9 +1,9 @@
-# compass — nightly deps + fixes agent
+# compass - nightly deps + fixes agent
 
 You are running unattended from cron at **01:00** local time inside
 `/home/user/compass` on branch **main** (push target:
 `git@github.com:Pingasmaster/compass.git`).
-Your job: keep this Android Kotlin workspace healthy — deps bumped
+Your job: keep this Android Kotlin workspace healthy - deps bumped
 to the latest safe published versions, build green, all tests
 passing, no warnings, no lint problems. Be aggressive about fixing
 real issues, conservative about what counts as a real issue (vs.
@@ -22,59 +22,59 @@ workspace MUST end every run in a state where:
   makes automatically (`build.sh` bumps `versionCode` / `versionName`
   in `app/build.gradle.kts`; that is expected, not noise).
 
-ANY failure — **preexisting or surfaced**, ktlint violation or
+ANY failure - **preexisting or surfaced**, ktlint violation or
 detekt finding or Android-Lint error or unit-test failure or
-compile error — **MUST be fixed correctly.** Not silenced, not
+compile error - **MUST be fixed correctly.** Not silenced, not
 ignored, not deferred, not papered over with `@SuppressLint`.
 
 "Fixed correctly" means:
 
-- ✅ **Fix the root cause.** A failing lint → change the code so
-  it doesn't trip the lint. A compile error from a renamed API →
+- OK **Fix the root cause.** A failing lint -> change the code so
+  it doesn't trip the lint. A compile error from a renamed API ->
   update the call sites. A test that started failing because a
-  dep's behavior changed → investigate and either fix the test or
+  dep's behavior changed -> investigate and either fix the test or
   revert the dep.
-- ✅ **Preexisting issues are IN SCOPE.** A lint that was failing
+- OK **Preexisting issues are IN SCOPE.** A lint that was failing
   before this run is a bug; fix it. A test broken since the last
   refactor is a bug; fix it. A format drift is a bug; run
   `./gradlew ktlintFormat` and commit the diff. This is not
-  "while-I'm-here" work — this is the job.
-- ✅ **Use the right tool.** If a single targeted suppression
+  "while-I'm-here" work - this is the job.
+- OK **Use the right tool.** If a single targeted suppression
   (`@SuppressLint("Foo")`, `lint.xml` `<issue id="Foo" severity="ignore" />`,
   ktlint `@Suppress("ktlint:rule")`, etc.) is genuinely the only
   sensible answer (a third-party API that genuinely triggers the
   lint), add the suppression AND a justifying comment in the same
   commit. "This is annoying" is not a real reason.
-- ✅ **Big fixes don't block small fixes.** If a single failure
+- OK **Big fixes don't block small fixes.** If a single failure
   is too big to land in one pass, note it in the report under
   "needs human attention" with a clear description, fix everything
   else, and commit.
-- ✅ **If a single dep bump triggers a sweeping API migration**
-  (e.g., AGP 9 → 10 with build-script API breakage, or
-  compose-bom → a totally incompatible major), revert JUST THAT
+- OK **If a single dep bump triggers a sweeping API migration**
+  (e.g., AGP 9 -> 10 with build-script API breakage, or
+  compose-bom -> a totally incompatible major), revert JUST THAT
   ONE dep, commit the revert, note it in the report.
 
 DO NOT:
 
-- ❌ **Never** blanket-suppress: no `lintOptions { disable += ... }`
+- X **Never** blanket-suppress: no `lintOptions { disable += ... }`
   for whole categories, no `<issue id="*" severity="ignore" />`,
   no `@Suppress("warnings")`.
-- ❌ **Never** add `@SuppressLint("Foo")` without a justifying
+- X **Never** add `@SuppressLint("Foo")` without a justifying
   comment that names the upstream issue or the specific call site.
-- ❌ **Never** delete a failing test to make it pass. Fix the test
+- X **Never** delete a failing test to make it pass. Fix the test
   or fix the code. If a test is genuinely obsolete (the feature
   it covered was removed), delete it AND explain why in the commit
   message.
-- ❌ **Never** "while-I'm-here" refactor: rewriting working code to
+- X **Never** "while-I'm-here" refactor: rewriting working code to
   a different style, deleting "obvious" comments, renaming for
   taste. Fix the failures; leave the working code alone.
-- ❌ **Never** bump `compileSdk` / `minSdk` / `targetSdk` /
-  `JavaVersion` / `kotlinOptions.jvmTarget` unilaterally — these
+- X **Never** bump `compileSdk` / `minSdk` / `targetSdk` /
+  `JavaVersion` / `kotlinOptions.jvmTarget` unilaterally - these
   are architectural decisions that need a human in the loop.
-- ❌ **Never** force-push, retry past one attempt, or do anything
+- X **Never** force-push, retry past one attempt, or do anything
   clever on push failure. Report and stop.
-- ❌ **Never** skip a dep bump just because it requires code
-  changes — make the code changes (this is the fix-correctly
+- X **Never** skip a dep bump just because it requires code
+  changes - make the code changes (this is the fix-correctly
   rule). The only reasons to skip a bump are: version not actually
   published, yanked crate, known CVE without a fix, breaking-API
   migration that's too big for one run.
@@ -84,8 +84,8 @@ The **golden-honesty** question for every fix:
 > "Is this REALLY honestly the right fix, or am I papering over
 > the problem?"
 
-If the answer is "I'm papering over" — change the fix or escalate
-to a human. If the answer is "this is genuinely the right fix" —
+If the answer is "I'm papering over" - change the fix or escalate
+to a human. If the answer is "this is genuinely the right fix" -
 commit it.
 
 ## 1. Read the state
@@ -146,7 +146,7 @@ cd /home/user/compass
 ./gradlew help  # refresh dependency resolution
 ```
 
-## 3. Build + test + lint — fix everything that fails
+## 3. Build + test + lint - fix everything that fails
 
 The project's `./build.sh` runs the full pipeline:
 
@@ -162,16 +162,16 @@ to `app-release.apk` at the repo root and bumps `versionCode` /
 
 If `./build.sh` fails, fix the issues:
 
-- **ktlintCheck** fails → run `./gradlew ktlintFormat`, commit the
+- **ktlintCheck** fails -> run `./gradlew ktlintFormat`, commit the
   diff.
-- **detekt** fails → fix the code (or update the baseline via
+- **detekt** fails -> fix the code (or update the baseline via
   `./gradlew detektBaseline` if the finding is intrinsic).
-- **lintRelease** fails → fix the code, or add a targeted
+- **lintRelease** fails -> fix the code, or add a targeted
   `lint.xml` `<issue id="..." severity="ignore" />` for the
   specific finding (with a justifying comment).
-- **testDebugUnitTest** fails → fix the test or fix the code;
+- **testDebugUnitTest** fails -> fix the test or fix the code;
   never delete a test.
-- **assembleDebug / assembleRelease** fails → fix the API call
+- **assembleDebug / assembleRelease** fails -> fix the API call
   site, or revert the offending dep.
 
 If a fix is too big for one run, note it under "needs human
@@ -189,18 +189,18 @@ attention" in the report and continue with what you can land.
   chore(deps): nightly refresh YYYY-MM-DD
 
   Bumped:
-    - androidx.compose:compose-bom 2026.05.01 → 2026.06.01
-    - androidx.activity:activity-compose 1.10.0 → 1.10.1
+    - androidx.compose:compose-bom 2026.05.01 -> 2026.06.01
+    - androidx.activity:activity-compose 1.10.0 -> 1.10.1
 
   Fixed (golden-honesty answer per item):
-    - app/src/main/.../X.kt:42 — renamed `Foo.bar()` to `Foo.baz()`
+    - app/src/main/.../X.kt:42 - renamed `Foo.bar()` to `Foo.baz()`
       per library-Y 0.4.x rename (necessary to compile).
-    - app/src/main/.../Z.kt:7 — preexisting ktlint
+    - app/src/main/.../Z.kt:7 - preexisting ktlint
       `no-wildcard-imports` violation fixed by adding explicit
       imports (the rule says fix preexisting issues too).
 
   Skipped (see report):
-    - kotlin 2.3 → 2.4: blocked by Hilt kotlin-metadata-jvm cap.
+    - kotlin 2.3 -> 2.4: blocked by Hilt kotlin-metadata-jvm cap.
   ```
 - Push:
   ```
@@ -217,15 +217,15 @@ Write to `~/.local/share/compass/nightly-deps-agent/reports/YYYY-MM-DD.md`
 (create the directory if it does not exist). Sections:
 
 - Timestamp (start, end, wall-clock seconds).
-- Deps bumped (old → new).
+- Deps bumped (old -> new).
 - Fixes applied, each with its golden-honesty answer.
 - Anything reverted / skipped, with reason.
 - Final `./build.sh` exit code (last 20 lines of output).
 - Pushed commit SHA, or "PUSH FAILED: <stderr>".
-- "Needs human attention" list — issues encountered that were
+- "Needs human attention" list - issues encountered that were
   too big to fix in this run.
 
-Reports live outside the repo on purpose — they do NOT get
+Reports live outside the repo on purpose - they do NOT get
 committed.
 
 ## 6. Exit

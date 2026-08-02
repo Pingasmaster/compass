@@ -21,7 +21,7 @@ class CompassApplication : Application() {
         userPreferences = UserPreferences(this)
         // Capture previous-process exit reasons on this launch so ANRs, OOMs, and native
         // crashes that happened while the app was dead become visible in logcat instead
-        // of just "process died" with no diagnostic. minSdk=31 ≥ API 30 (ApplicationExitInfo
+        // of just "process died" with no diagnostic. minSdk=31 ? API 30 (ApplicationExitInfo
         // added in API 30) so no runtime SDK gate is required.
         capturePreviousExitReasons()
     }
@@ -43,7 +43,7 @@ class CompassApplication : Application() {
             // Defensive: never let diagnostics crash app startup. SecurityException is
             // the only checked-like failure mode the ActivityManager API can throw here
             // (process gone, permission flip mid-call). Other Throwables are intentionally
-            // not swallowed — they'd indicate a programming bug worth surfacing.
+            // not swallowed - they'd indicate a programming bug worth surfacing.
             Log.w(TAG, "getHistoricalProcessExitReasons denied")
         } catch (e: IllegalArgumentException) {
             Log.w(TAG, "getHistoricalProcessExitReasons invalid args", e)
@@ -58,7 +58,7 @@ class CompassApplication : Application() {
      * in-memory caches (DataStore-backed UserPreferences is cheap to
      * re-read), so the override is the canonical landing pad for future
      * trim hooks. Remaining trim levels are listed explicitly to satisfy
-     * SwitchIntDef lint — they remain no-ops. The remaining levels are
+     * SwitchIntDef lint - they remain no-ops. The remaining levels are
      * marked @Deprecated in the platform since API 35 but are still part
      * of the @IntDef that SwitchIntDef validates against.
      */

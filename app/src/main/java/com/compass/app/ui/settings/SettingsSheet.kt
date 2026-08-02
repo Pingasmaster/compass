@@ -72,7 +72,7 @@ fun SettingsSheet(
             )
 
             SectionLabel(stringResource(R.string.settings_theme_label))
-            // Connected M3 Expressive segmented selector — ToggleButtons with
+            // Connected M3 Expressive segmented selector - ToggleButtons with
             // connectedLeading/Middle/TrailingButtonShapes, which morphs the selected
             // button to a rounded pill while neighbours compress (this is the
             // Expressive refresh of the classic SingleChoiceSegmentedButtonRow).
@@ -114,7 +114,7 @@ fun SettingsSheet(
             Spacer(Modifier.height(20.dp))
 
             SectionLabel(stringResource(R.string.settings_responsiveness_label))
-            // Same connected-ToggleButton pattern as the theme picker — M3E segmented.
+            // Same connected-ToggleButton pattern as the theme picker - M3E segmented.
             val responsivenessOptions = Responsiveness.entries
             val respSelectedIndex = responsivenessOptions.indexOf(responsiveness)
             Row(

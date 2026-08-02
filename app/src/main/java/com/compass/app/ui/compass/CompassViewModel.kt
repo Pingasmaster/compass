@@ -2,13 +2,17 @@ package com.compass.app.ui.compass
 
 import android.Manifest
 import android.annotation.SuppressLint
-import android.app.Application
+import android.content.Context
 import android.content.pm.PackageManager
 import android.location.LocationListener
 import android.location.LocationManager
-import androidx.lifecycle.AndroidViewModel
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.CreationExtras
 import com.compass.app.CompassApplication
 import com.compass.app.data.preferences.UserPreferences
 import com.compass.app.domain.model.CompassReading
@@ -21,18 +25,22 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 private const val KEY_TARGET_ANGLE = "target_angle"
+private const val DEGREES_CIRCLE = 360f
 
-class CompassViewModel(application: Application, private val savedState: SavedStateHandle) : AndroidViewModel(application) {
+/** Wrap [degrees] into `[0, 360)`. */
+internal fun normalizeBearingDegrees(degrees: Float): Float = ((degrees % DEGREES_CIRCLE) + DEGREES_CIRCLE) % DEGREES_CIRCLE
 
-    val prefs: UserPreferences = (application as CompassApplication).userPreferences
+class CompassViewModel(val prefs: UserPreferences, appContext: Context, private val savedState: SavedStateHandle) : ViewModel() {
 
-    private val sensor = CompassSensor(application)
+    private val appContext = appContext.applicationContext
+
+    private val sensor = CompassSensor(this.appContext)
     private val locationManager =
-        application.getSystemService(LocationManager::class.java)
+        this.appContext.getSystemService(LocationManager::class.java)
 
     private var locationListener: LocationListener? = null
 
-    // Sensor flow — stateIn drives registration via WhileSubscribed. The ViewModel no longer
+    // Sensor flow - stateIn drives registration via WhileSubscribed. The ViewModel no longer
     // needs onResume/onPause hooks; the composable's `collectAsStateWithLifecycle` controls it.
     val readings: StateFlow<CompassReading> =
         sensor.readings.stateIn(
@@ -45,7 +53,7 @@ class CompassViewModel(application: Application, private val savedState: SavedSt
     val targetAngle: StateFlow<Float?> = _targetAngle.asStateFlow()
 
     fun setTargetAngle(value: Float?) {
-        val normalised = value?.let { ((it % 360f) + 360f) % 360f }
+        val normalised = value?.let(::normalizeBearingDegrees)
         _targetAngle.value = normalised
         savedState[KEY_TARGET_ANGLE] = normalised
     }
@@ -55,7 +63,7 @@ class CompassViewModel(application: Application, private val savedState: SavedSt
             prefs.trueNorthEnabled.collect { enabled ->
                 // If the pref says true but the runtime permission is gone (revoked
                 // between sessions, or never granted), pull the toggle back to false
-                // so the readout doesn't claim "+0.0° declination" while silently
+                // so the readout doesn't claim "+0.0 deg declination" while silently
                 // showing magnetic readings.
                 if (enabled && !hasCoarseLocationPermission()) {
                     prefs.setTrueNorth(false)
@@ -67,7 +75,8 @@ class CompassViewModel(application: Application, private val savedState: SavedSt
         }
     }
 
-    private fun hasCoarseLocationPermission(): Boolean = getApplication<Application>().checkSelfPermission(
+    private fun hasCoarseLocationPermission(): Boolean = ContextCompat.checkSelfPermission(
+        appContext,
         Manifest.permission.ACCESS_COARSE_LOCATION,
     ) == PackageManager.PERMISSION_GRANTED
 
@@ -89,7 +98,12 @@ class CompassViewModel(application: Application, private val savedState: SavedSt
         val listener = LocationListener { location -> sensor.updateLocation(location) }
         locationListener = listener
         manager.getLastKnownLocation(provider)?.let(sensor::updateLocation)
-        manager.requestLocationUpdates(provider, 60_000L, 100f, listener)
+        manager.requestLocationUpdates(
+            provider,
+            LOCATION_MIN_TIME_MS,
+            LOCATION_MIN_DISTANCE_M,
+            listener,
+        )
     }
 
     private fun stopLocationUpdates() {
@@ -98,7 +112,35 @@ class CompassViewModel(application: Application, private val savedState: SavedSt
     }
 
     override fun onCleared() {
-        // No super call — ViewModel.onCleared is @EmptySuper and lint flags it.
+        // No super call - ViewModel.onCleared is @EmptySuper and lint flags it.
         stopLocationUpdates()
+    }
+
+    companion object {
+        private const val LOCATION_MIN_TIME_MS = 60_000L
+        private const val LOCATION_MIN_DISTANCE_M = 100f
+
+        /**
+         * Factory that reads [UserPreferences] from [CompassApplication] via
+         * [ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] (no Hilt).
+         */
+        val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
+            override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
+                require(modelClass.isAssignableFrom(CompassViewModel::class.java)) {
+                    "Unknown ViewModel class: ${modelClass.name}"
+                }
+                val app = checkNotNull(
+                    extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY],
+                ) {
+                    "APPLICATION_KEY missing from CreationExtras"
+                } as CompassApplication
+                val savedState = extras.createSavedStateHandle()
+                return checkNotNull(
+                    modelClass.cast(CompassViewModel(app.userPreferences, app, savedState)),
+                ) {
+                    "Unable to cast ViewModel to ${modelClass.name}"
+                }
+            }
+        }
     }
 }

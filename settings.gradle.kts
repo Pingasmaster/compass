@@ -1,10 +1,10 @@
-// Compass — settings.gradle.kts
+// Compass - settings.gradle.kts
 //
 // Modernized for Gradle 9.6.0:
 //   - foojay-resolver-convention: JDK toolchain auto-provisioning (daemon JVM 25)
 //   - enableFeaturePreview("NO_IMPLICIT_LOOKUP_IN_PARENT_PROJECTS"): adopt Gradle 10 behavior
 //     (eliminates implicit project.properties() / findProperty() / hasProperty() lookups in
-//     parent projects — see https://docs.gradle.org/9.6.0/userguide/upgrading_version_9.html)
+//     parent projects - see https://docs.gradle.org/9.6.0/userguide/upgrading_version_9.html)
 //   - enableFeaturePreview("STABLE_CONFIGURATION_CACHE"): recommended complementary preview
 //   - FAIL_ON_PROJECT_REPOS: force all repositories declared in dependencyResolutionManagement
 //   - version-catalog "libs" is automatic when gradle/libs.versions.toml exists
@@ -46,3 +46,4 @@ rootProject.name = "Compass"
 include(":app")
 include(":baselineprofile")
 include(":macrobenchmark")
+include(":shippedsmoke")

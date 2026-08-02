@@ -6,10 +6,10 @@ import kotlin.math.sin
 
 /**
  * Low-pass filter over angles using separate sin/cos EMAs so that the
- * 0°/360° seam is handled correctly. Naïve EMA on raw degrees would
- * generate a 359° → 0° average of ~180°, which is visibly wrong.
+ * 0 deg/360 deg seam is handled correctly. Na?ve EMA on raw degrees would
+ * generate a 359 deg -> 0 deg average of ~180 deg, which is visibly wrong.
  *
- * @param alpha 0..1 — higher tracks faster, lower is smoother.
+ * @param alpha 0..1 - higher tracks faster, lower is smoother.
  */
 class AzimuthSmoother(private val alpha: Float = 0.15f) {
     init {
@@ -50,9 +50,9 @@ class AzimuthSmoother(private val alpha: Float = 0.15f) {
  * the 0/360 seam. Returns the cumulative angle that differs from [previous]
  * by the shortest signed delta to [newAngle].
  *
- * At an exact ±180° antipode the naïve `(x % 360 + 540) % 360 - 180` formula
+ * At an exact ?180 deg antipode the na?ve `(x % 360 + 540) % 360 - 180` formula
  * rounds delta to 0, making the rose freeze. We bias toward +180 whenever the
- * signed delta lands on −180 so opposite headings always animate.
+ * signed delta lands on ?180 so opposite headings always animate.
  */
 fun unwrapAngle(previous: Float, newAngle: Float): Float {
     var diff = ((newAngle - previous) % 360f + 540f) % 360f - 180f

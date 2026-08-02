@@ -30,7 +30,7 @@ class AzimuthSmootherTest {
 
     @Test
     fun `seam from 359 to 1 does not overshoot through 180`() {
-        // Naïve EMA would average 359 and 1 to 180. sin/cos filter must avoid that.
+        // Na?ve EMA would average 359 and 1 to 180. sin/cos filter must avoid that.
         val s = AzimuthSmoother(alpha = 0.5f)
         s.update(359f)
         val out = s.update(1f)
@@ -96,7 +96,7 @@ class UnwrapAngleTest {
 
     @Test
     fun `antipode distance resolves toward plus 180`() {
-        // Exactly 180° apart — convention: always bias toward +180 so opposite
+        // Exactly 180 deg apart - convention: always bias toward +180 so opposite
         // headings actually animate instead of reporting a zero delta.
         assertEquals(180f, unwrapAngle(0f, 180f), 0.001f)
         assertEquals(190f, unwrapAngle(10f, 190f), 0.001f)

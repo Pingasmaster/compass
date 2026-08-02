@@ -9,6 +9,8 @@ android {
 
     targetProjectPath = ":app"
 
+    experimentalProperties["android.experimental.self-instrumenting"] = true
+
     // The producer module pulls the full app classpath in via
     // `implementation(project(":app"))` (BaselineProfileRule.collect needs the
     // app's MainActivity on the classpath), which pushes the merged dex over
@@ -16,6 +18,13 @@ android {
     // need the support-library multidex dependency.
     defaultConfig {
         minSdk = 31
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    buildTypes {
+        create("release") {
+            signingConfig = signingConfigs.getByName("debug")
+        }
     }
 
     testOptions.managedDevices.localDevices {

@@ -58,7 +58,7 @@ class ScrollBenchmarks {
             val radius = (bounds.width() / 2).coerceAtLeast(50)
 
             repeat(20) { step ->
-                val angle = (step * 18f) // 360° / 20 swipes
+                val angle = (step * 18f) // 360 deg / 20 swipes
                 val fromX = centerX + (kotlin.math.cos(Math.toRadians(angle.toDouble())) * radius).toInt()
                 val fromY = centerY + (kotlin.math.sin(Math.toRadians(angle.toDouble())) * radius).toInt()
                 val toX = centerX + (kotlin.math.cos(Math.toRadians((angle + 30f).toDouble())) * radius).toInt()

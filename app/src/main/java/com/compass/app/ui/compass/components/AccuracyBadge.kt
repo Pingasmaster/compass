@@ -59,7 +59,7 @@ fun CalibrationBanner(accuracy: CompassAccuracy, modifier: Modifier = Modifier) 
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                // M3 Expressive LoadingIndicator — polygon sequence that morphs while spinning.
+                // M3 Expressive LoadingIndicator - polygon sequence that morphs while spinning.
                 ContainedLoadingIndicator(
                     modifier = Modifier.size(44.dp),
                     containerColor = MaterialTheme.colorScheme.errorContainer,

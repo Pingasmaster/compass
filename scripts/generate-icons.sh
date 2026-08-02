@@ -10,9 +10,9 @@ cd "$SCRIPT_DIR/.."
 SRC="logo.png"
 BG_COLOR="#F6F4F0"   # cream background sampled from logo.png
 FUZZ="8%"            # tolerance when stripping background
-CONTENT_RATIO="0.44" # content fraction of canvas (safe zone is 0.61) — extra padding so the logo sits comfortably inside every mask
+CONTENT_RATIO="0.44" # content fraction of canvas (safe zone is 0.61) - extra padding so the logo sits comfortably inside every mask
 
-# Density → foreground canvas size (px). Foreground is 108dp; 1dp = 1px at mdpi.
+# Density -> foreground canvas size (px). Foreground is 108dp; 1dp = 1px at mdpi.
 declare -A DENSITIES=(
     [mdpi]=108
     [hdpi]=162
@@ -23,7 +23,7 @@ declare -A DENSITIES=(
 
 RES_DIR="app/src/main/res"
 
-# Build a "masked" version of the logo: cream → transparent, keep dark content.
+# Build a "masked" version of the logo: cream -> transparent, keep dark content.
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
@@ -35,7 +35,7 @@ CROPPED="$TMP/cropped.png"
 magick "$MASKED" -trim +repage "$CROPPED"
 
 # Derive a pure-white silhouette for the monochrome layer.
-# Any non-transparent pixel → opaque white.
+# Any non-transparent pixel -> opaque white.
 MONOCROP="$TMP/mono_cropped.png"
 magick "$CROPPED" \
     -alpha extract "$TMP/alpha.png"

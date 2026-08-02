@@ -5,7 +5,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.expressiveLightColorScheme
 import androidx.compose.ui.graphics.Color
 
-// Seed: deep nautical teal — reads as "compass"
+// Seed: deep nautical teal - reads as "compass"
 val CompassSeed = Color(0xFF1E6F82)
 
 // Directional accent colours used by CompassRose.

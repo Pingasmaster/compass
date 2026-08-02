@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
 #
 # Usage:
-#   ./build.sh                    # clean + ktlintCheck + detekt + lintRelease + test + assemble + bump version
+#   ./build.sh                    # bump version + clean + ASCII + ktlint + detekt + lint
+#                                 # + tests + assemble harnesses + assemble APK
 #                                 # then one-shot NetBird APK HTTP serve at :8765/app-release.apk
+#                                 # (+ copy release mapping.txt next to the APK)
 #   ./build.sh --clean            # gradle clean + remove APK + exit
 #   ./build.sh --format           # ktlintFormat + exit (no build)
 #   ./build.sh --build-health     # full build + dependency-analysis buildHealth report
+#   ./build.sh --smoke            # GMD Pixel 7a API 37 @SmokeTest
+#   ./build.sh --smoke-shipped    # :shippedsmoke release lane
+#   ./build.sh --baseline-profile # regenerate baseline profiles via GMD
+#   ./build.sh --macrobenchmark   # advisory emulator macrobenchmarks
 #
 # After a successful full build, scripts/apk_http_serve.sh publishes
 # http://<netbird-fqdn>:8765/app-release.apk until the first complete download,
@@ -23,16 +29,16 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Prefer a real JDK 25, then wrap it so Gradle Worker Daemons (ktlint) also
-# get the JEP 498 / JEP 472 opt-in flags. Workers use the daemon's java
-# executable by absolute path and ignore JAVA_TOOL_OPTIONS / org.gradle.jvmargs.
+./scripts/apk_http_serve.sh stop || true
+
 if [[ -z "${JAVA_HOME:-}" || "${JAVA_HOME}" == "${SCRIPT_DIR}/.jdk25-home" ]]; then
     unset JAVA_HOME
     for candidate in \
+        "${HOME}/.jdks/jdk-25" \
         /usr/lib/jvm/java-25-openjdk-amd64 \
         /usr/lib/jvm/java-25-openjdk \
-        "$HOME/.jdks/jdk-25"; do
-        if [[ -x "$candidate/bin/java" ]]; then
+        /usr/lib/jvm/temurin-25-jdk-amd64; do
+        if [[ -x "${candidate}/bin/java" ]]; then
             export JAVA_HOME="$candidate"
             break
         fi
@@ -41,33 +47,35 @@ fi
 # shellcheck source=scripts/ensure-jdk25-home.sh
 source "$SCRIPT_DIR/scripts/ensure-jdk25-home.sh"
 
-# Also export for any forked JVM that does honor JAVA_TOOL_OPTIONS (client
-# launcher, Kotlin compile daemon children outside the worker pool).
 export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:+$JAVA_TOOL_OPTIONS }--sun-misc-unsafe-memory-access=allow --enable-native-access=ALL-UNNAMED"
 
-# Any build.sh invocation stops a leftover one-shot APK HTTP serve from a
-# previous successful build (also stopped by first download or 10 min timeout).
-./scripts/apk_http_serve.sh stop || true
-
-# Argument parsing
 DO_CLEAN_ONLY=0
 DO_FORMAT=0
 DO_BUILD_HEALTH=0
+DO_SMOKE=0
+DO_SMOKE_SHIPPED=0
+DO_BASELINE_PROFILE=0
+DO_MACROBENCHMARK=0
 
 ROOT_APK="app-release.apk"
+ROOT_MAPPING="app-release-mapping.txt"
 for arg in "$@"; do
     case "$arg" in
-        --clean)        DO_CLEAN_ONLY=1 ;;
-        --format)       DO_FORMAT=1 ;;
-        --build-health) DO_BUILD_HEALTH=1 ;;
-        *) echo "Unknown arg: $arg (accepted: --clean, --format, --build-health)" >&2; exit 2 ;;
+        --clean)             DO_CLEAN_ONLY=1 ;;
+        --format)            DO_FORMAT=1 ;;
+        --build-health)      DO_BUILD_HEALTH=1 ;;
+        --smoke)             DO_SMOKE=1 ;;
+        --smoke-shipped)     DO_SMOKE_SHIPPED=1 ;;
+        --baseline-profile)  DO_BASELINE_PROFILE=1 ;;
+        --macrobenchmark)    DO_MACROBENCHMARK=1 ;;
+        *)
+            echo "Unknown arg: $arg (accepted: --clean, --format, --build-health," \
+                "--smoke, --smoke-shipped, --baseline-profile, --macrobenchmark)" >&2
+            exit 2
+            ;;
     esac
 done
 
-# Global lock shared by dustvalve_next / calc / compass / STT_premium.
-# flock is held on FD 9 for the lifetime of this process; do not delete the
-# lockfile on exit (removing it while held lets another process open a new
-# inode and bypass the lock).
 acquire_lock() {
     local lock_dir="${XDG_CACHE_HOME:-$HOME/.cache}/android-apps"
     mkdir -p "$lock_dir"
@@ -80,16 +88,17 @@ acquire_lock() {
     fi
 }
 
-# --clean: just run gradle clean and exit, do nothing else
+GMD_GPU=(-Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect)
+SMOKE_ANNOTATION="com.compass.app.testing.SmokeTest"
+
 if [[ "$DO_CLEAN_ONLY" -eq 1 ]]; then
     acquire_lock
     ./gradlew clean
-    rm -f "$ROOT_APK"
+    rm -f "$ROOT_APK" "$ROOT_MAPPING"
     echo "Clean complete."
     exit 0
 fi
 
-# --format: ktlintFormat only, no build, no version bump
 if [[ "$DO_FORMAT" -eq 1 ]]; then
     acquire_lock
     ./gradlew ktlintFormat
@@ -97,40 +106,67 @@ if [[ "$DO_FORMAT" -eq 1 ]]; then
     exit 0
 fi
 
-# Default: full build (always starts with clean, includes test if available)
+if [[ "$DO_SMOKE" -eq 1 ]]; then
+    acquire_lock
+    ./gradlew :app:pixel7aApi37Setup "${GMD_GPU[@]}"
+    ./gradlew :app:pixel7aApi37DebugAndroidTest "${GMD_GPU[@]}" \
+        -Pandroid.testInstrumentationRunnerArguments.annotation="$SMOKE_ANNOTATION"
+    ./scripts/assert_tests_ran.sh 1 app
+    echo "Smoke complete."
+    exit 0
+fi
+
+if [[ "$DO_SMOKE_SHIPPED" -eq 1 ]]; then
+    acquire_lock
+    ./gradlew :shippedsmoke:pixel7aApi37Setup "${GMD_GPU[@]}"
+    ./gradlew :shippedsmoke:pixel7aApi37ReleaseAndroidTest "${GMD_GPU[@]}"
+    ./scripts/assert_tests_ran.sh 1 shippedsmoke
+    echo "Shipped smoke complete."
+    exit 0
+fi
+
+if [[ "$DO_BASELINE_PROFILE" -eq 1 ]]; then
+    acquire_lock
+    if [[ ! -e /dev/kvm ]]; then
+        echo "ERROR: /dev/kvm missing; GMD baseline generation needs KVM." >&2
+        exit 1
+    fi
+    ./gradlew :baselineprofile:pixel7aApi37Setup "${GMD_GPU[@]}"
+    ./gradlew :baselineprofile:pixel7aApi37ReleaseAndroidTest "${GMD_GPU[@]}" \
+        -Pandroid.testInstrumentationRunnerArguments.androidx.benchmark.enabledRules=baselineprofile
+    ./scripts/assert_tests_ran.sh 1 baselineprofile
+    chmod +x ./scripts/install_baseline_profiles.sh
+    ./scripts/install_baseline_profiles.sh
+    echo "Baseline profile regeneration complete."
+    echo "Re-run ./build.sh (full) so assembleRelease packages the new profiles."
+    exit 0
+fi
+
+if [[ "$DO_MACROBENCHMARK" -eq 1 ]]; then
+    acquire_lock
+    ./gradlew :macrobenchmark:pixel7aApi37Setup "${GMD_GPU[@]}"
+    ./gradlew :macrobenchmark:pixel7aApi37ReleaseAndroidTest "${GMD_GPU[@]}" \
+        -Pandroid.testInstrumentationRunnerArguments.androidx.benchmark.suppressErrors=EMULATOR
+    ./scripts/assert_tests_ran.sh 1 macrobenchmark
+    echo "Macrobenchmark complete (emulator numbers are advisory)."
+    exit 0
+fi
+
 acquire_lock
 
+./scripts/check_ascii.sh
+
 GRADLE_APK="app/build/outputs/apk/release/app-release.apk"
+GRADLE_MAPPING="app/build/outputs/mapping/release/mapping.txt"
 BUILD_GRADLE="app/build.gradle.kts"
 
-# Build tasks: lint stages first (cheap, fail fast), then assemble.
-GRADLE_TASKS=(clean ktlintCheck detekt lintRelease assembleDebug assembleRelease)
+CURRENT_CODE=$(sed -n 's/.*versionCode = \([0-9][0-9]*\).*/\1/p' "$BUILD_GRADLE" | head -1)
+CURRENT_NAME=$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' "$BUILD_GRADLE" | head -1)
 
-# Add test task if project has test sources
-if [[ -d "app/src/test" ]]; then
-    GRADLE_TASKS+=(testDebugUnitTest)
+if [[ -z "$CURRENT_CODE" || -z "$CURRENT_NAME" ]]; then
+    echo "ERROR: could not parse versionCode/versionName from $BUILD_GRADLE" >&2
+    exit 1
 fi
-
-./gradlew "${GRADLE_TASKS[@]}"
-
-# Optional: dependency-analysis report (informational; not a build gate).
-if [[ "$DO_BUILD_HEALTH" -eq 1 ]]; then
-    ./gradlew buildHealth || true
-    REPORT="build/reports/dependency-analysis/build-health-report.txt"
-    [[ -f "$REPORT" ]] && echo "Dependency-analysis report: $REPORT"
-fi
-
-# Replace root APK with fresh build
-rm -f "$ROOT_APK"
-cp "$GRADLE_APK" "$ROOT_APK"
-echo "Copied release APK to $ROOT_APK"
-
-# One-shot NetBird sideload URL (first download / 10 min / next build.sh).
-./scripts/apk_http_serve.sh start "$ROOT_APK"
-
-# Always bump version
-CURRENT_CODE=$(sed -n 's/.*versionCode = \([0-9]*\).*/\1/p' "$BUILD_GRADLE")
-CURRENT_NAME=$(sed -n 's/.*versionName = "\([^"]*\)".*/\1/p' "$BUILD_GRADLE")
 
 NEW_CODE=$((CURRENT_CODE + 1))
 NEW_NAME=$(echo "$CURRENT_NAME" | awk -F. -v OFS=. '{$NF=$NF+1; print}')
@@ -139,3 +175,45 @@ sed -i "s/versionCode = $CURRENT_CODE/versionCode = $NEW_CODE/" "$BUILD_GRADLE"
 sed -i "s/versionName = \"$CURRENT_NAME\"/versionName = \"$NEW_NAME\"/" "$BUILD_GRADLE"
 
 echo "Bumped version: $CURRENT_NAME ($CURRENT_CODE) -> $NEW_NAME ($NEW_CODE)"
+
+revert_version_bump() {
+    sed -i "s/versionCode = $NEW_CODE/versionCode = $CURRENT_CODE/" "$BUILD_GRADLE"
+    sed -i "s/versionName = \"$NEW_NAME\"/versionName = \"$CURRENT_NAME\"/" "$BUILD_GRADLE"
+    echo "Build failed: reverted version to $CURRENT_NAME ($CURRENT_CODE)." >&2
+}
+
+GRADLE_TASKS=(
+    clean
+    ktlintCheck
+    detekt
+    lintRelease
+    testDebugUnitTest
+    :macrobenchmark:assembleRelease
+    # androidx.baselineprofile producer plugin makes assembleRelease ambiguous
+    # (assembleBenchmarkRelease vs assembleNonMinifiedRelease).
+    :baselineprofile:assembleNonMinifiedRelease
+    :shippedsmoke:assembleRelease
+    assembleDebug
+    assembleRelease
+)
+
+if ! ./gradlew "${GRADLE_TASKS[@]}"; then
+    revert_version_bump
+    exit 1
+fi
+
+if [[ "$DO_BUILD_HEALTH" -eq 1 ]]; then
+    ./gradlew buildHealth || true
+    REPORT="build/reports/dependency-analysis/build-health-report.txt"
+    [[ -f "$REPORT" ]] && echo "Dependency-analysis report: $REPORT"
+fi
+
+rm -f "$ROOT_APK" "$ROOT_MAPPING"
+cp "$GRADLE_APK" "$ROOT_APK"
+echo "Copied release APK to $ROOT_APK"
+if [[ -f "$GRADLE_MAPPING" ]]; then
+    cp "$GRADLE_MAPPING" "$ROOT_MAPPING"
+    echo "Copied release mapping to $ROOT_MAPPING"
+fi
+
+./scripts/apk_http_serve.sh start "$ROOT_APK"

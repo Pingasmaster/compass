@@ -25,14 +25,9 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.text.TextMeasurer
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.drawText
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -41,13 +36,10 @@ import com.compass.app.domain.sensor.unwrapAngle
 import com.compass.app.ui.theme.NorthRed
 import com.compass.app.ui.theme.NorthRedDark
 import kotlinx.coroutines.flow.collectLatest
-import kotlin.math.cos
-import kotlin.math.sin
 import androidx.compose.ui.graphics.Path as ComposePath
 
 /**
- * Rotating compass rose. The outer ring is [MaterialShapes.Cookie12Sided] — the M3
- * Expressive preset polygon. Tick marks and cardinal letters ride on an inner rotating
+ * Rotating compass rose. Tick marks and cardinal letters ride on an inner rotating
  * disc; a fixed red needle and top triangle indicate the current heading.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -63,13 +55,8 @@ fun CompassRose(
 ) {
     val cumulativeAngle = remember { Animatable(0f) }
     val animSpec: AnimationSpec<Float> = remember(responsiveness) { responsiveness.toSpringSpec() }
-    // rememberUpdatedState wraps the incoming Float param in a State<Float> that updates
-    // on every recomposition. snapshotFlow reads from that State, so changes to
-    // azimuthDegrees actually propagate to the coroutine — without a bare
-    // `snapshotFlow { azimuthDegrees }` on a non-state Float, which would capture the
-    // value once and never re-emit. The effect is keyed on animSpec so a Settings-time
-    // responsiveness change restarts the collector with the new spec instead of the
-    // original closure-captured one (which would silently ignore the setting).
+    // rememberUpdatedState + snapshotFlow so azimuth changes restart the spring without
+    // capturing a stale Float; keyed on animSpec so Settings responsiveness changes apply.
     val latestAzimuth by rememberUpdatedState(azimuthDegrees)
     LaunchedEffect(animSpec) {
         snapshotFlow { latestAzimuth }
@@ -81,44 +68,97 @@ fun CompassRose(
             }
     }
 
-    val onSurface = MaterialTheme.colorScheme.onSurface
-    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
-    val primary = MaterialTheme.colorScheme.primary
-    val onPrimary = MaterialTheme.colorScheme.onPrimary
-    val surfaceContainer = MaterialTheme.colorScheme.surfaceContainer
-    val outlineVariant = MaterialTheme.colorScheme.outlineVariant
-    val errorColor = MaterialTheme.colorScheme.error
-    val needleNorth = if (isDark) NorthRedDark else NorthRed
-    val needleSouth = MaterialTheme.colorScheme.surfaceContainerHighest
-
-    // rememberInfiniteTransition ticks even when its animated value is constant, so
-    // keep it off the composition entirely while idle.
+    val colors = rememberRoseColors(isDark = isDark)
     val ringColor = if (calibrating) {
-        pulsingRingColor(base = outlineVariant, pulse = errorColor)
+        pulsingRingColor(base = colors.outlineVariant, pulse = colors.error)
     } else {
-        outlineVariant
+        colors.outlineVariant
     }
+    val cardinalLayouts = rememberCardinalLayouts(colors = colors)
 
+    Box(modifier = modifier) {
+        RoseBaseLayer(
+            surfaceContainer = colors.surfaceContainer,
+            ringColor = ringColor,
+        )
+        RoseRotatingLayer(
+            rotationDegrees = { cumulativeAngle.value },
+            layouts = cardinalLayouts,
+            onSurface = colors.onSurface,
+            onSurfaceVariant = colors.onSurfaceVariant,
+            targetAngle = targetAngle,
+            targetColor = targetColor,
+        )
+        RoseNeedleLayer(
+            needleNorth = colors.needleNorth,
+            needleSouth = colors.needleSouth,
+            primary = colors.primary,
+            onPrimary = colors.onPrimary,
+        )
+    }
+}
+
+@Immutable
+private data class RoseColors(
+    val onSurface: Color,
+    val onSurfaceVariant: Color,
+    val primary: Color,
+    val onPrimary: Color,
+    val surfaceContainer: Color,
+    val outlineVariant: Color,
+    val error: Color,
+    val needleNorth: Color,
+    val needleSouth: Color,
+)
+
+@Composable
+private fun rememberRoseColors(isDark: Boolean): RoseColors {
+    val scheme = MaterialTheme.colorScheme
+    val needleNorth = if (isDark) NorthRedDark else NorthRed
+    return remember(
+        scheme.onSurface,
+        scheme.onSurfaceVariant,
+        scheme.primary,
+        scheme.onPrimary,
+        scheme.surfaceContainer,
+        scheme.outlineVariant,
+        scheme.error,
+        scheme.surfaceContainerHighest,
+        needleNorth,
+    ) {
+        RoseColors(
+            onSurface = scheme.onSurface,
+            onSurfaceVariant = scheme.onSurfaceVariant,
+            primary = scheme.primary,
+            onPrimary = scheme.onPrimary,
+            surfaceContainer = scheme.surfaceContainer,
+            outlineVariant = scheme.outlineVariant,
+            error = scheme.error,
+            needleNorth = needleNorth,
+            needleSouth = scheme.surfaceContainerHighest,
+        )
+    }
+}
+
+@Composable
+private fun rememberCardinalLayouts(colors: RoseColors): List<Pair<CardinalMarker, TextLayoutResult>> {
     val cardinalStyle = MaterialTheme.typography.headlineSmall
     val intercardinalStyle = MaterialTheme.typography.labelLarge
     val textMeasurer = rememberTextMeasurer()
-    // Pre-measure the eight cardinal/intercardinal labels once per colour+style pair —
-    // the rose redraws at sensor rate (~50 Hz), so doing it inside draw was cheap but
-    // not free.
-    val cardinalLayouts = remember(
+    return remember(
         cardinalStyle,
         intercardinalStyle,
         textMeasurer,
-        needleNorth,
-        onSurface,
-        onSurfaceVariant,
+        colors.needleNorth,
+        colors.onSurface,
+        colors.onSurfaceVariant,
     ) {
         CardinalMarkers.map { marker ->
             val style = if (marker.main) cardinalStyle else intercardinalStyle
             val color = when {
-                marker.label == "N" -> needleNorth
-                marker.main -> onSurface
-                else -> onSurfaceVariant
+                marker.label == "N" -> colors.needleNorth
+                marker.main -> colors.onSurface
+                else -> colors.onSurfaceVariant
             }
             marker to textMeasurer.measure(
                 text = marker.label,
@@ -126,107 +166,85 @@ fun CompassRose(
             )
         }
     }
+}
 
-    Box(modifier = modifier) {
-        // Static base layer: disc + ring outline. Independent of rotation, so it
-        // doesn't redraw on every spring frame.
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val w = size.width
-            val h = size.height
-            val cx = w / 2f
-            val cy = h / 2f
-            val roseRadius = minOf(w, h) / 2f - 14.dp.toPx()
+@Composable
+private fun RoseBaseLayer(surfaceContainer: Color, ringColor: Color) {
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val roseRadius = roseRadiusPx()
+        val center = Offset(size.width / 2f, size.height / 2f)
+        drawCircle(color = surfaceContainer, radius = roseRadius, center = center)
+        drawCircle(
+            color = ringColor,
+            radius = roseRadius,
+            center = center,
+            style = Stroke(width = 2.dp.toPx()),
+        )
+    }
+}
 
-            // Rose base disc with a ring outline. When calibrating, the ring pulses
-            // toward the error colour — no extra backdrop shape.
-            drawCircle(
-                color = surfaceContainer,
-                radius = roseRadius,
-                center = Offset(cx, cy),
-            )
-            drawCircle(
-                color = ringColor,
-                radius = roseRadius,
-                center = Offset(cx, cy),
-                style = Stroke(width = 2.dp.toPx()),
-            )
-        }
-
-        // Rotating layer: ticks + cardinals + target line. The rotation state is
-        // read inside `graphicsLayer { ... }` so spring updates only re-apply a
-        // hardware-accelerated transform on the cached RenderNode — the Canvas
-        // draw scope itself doesn't invalidate. This keeps the rose smooth in
-        // Battery Saver, where CPU throttling otherwise saturates per-frame
-        // redraws of the 72 ticks + 8 cardinal labels.
-        Canvas(
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer { rotationZ = cumulativeAngle.value },
-        ) {
-            val w = size.width
-            val h = size.height
-            val cx = w / 2f
-            val cy = h / 2f
-            val roseRadius = minOf(w, h) / 2f - 14.dp.toPx()
-
-            drawTicks(
+@Composable
+private fun RoseRotatingLayer(
+    rotationDegrees: () -> Float,
+    layouts: List<Pair<CardinalMarker, TextLayoutResult>>,
+    onSurface: Color,
+    onSurfaceVariant: Color,
+    targetAngle: Float?,
+    targetColor: Color,
+) {
+    // graphicsLayer reads rotation so spring frames only re-apply a transform.
+    Canvas(
+        modifier = Modifier
+            .fillMaxSize()
+            .graphicsLayer { rotationZ = rotationDegrees() },
+    ) {
+        val roseRadius = roseRadiusPx()
+        val cx = size.width / 2f
+        val cy = size.height / 2f
+        drawTicks(
+            centerX = cx,
+            centerY = cy,
+            outerRadius = roseRadius * 0.99f,
+            majorColor = onSurface,
+            minorColor = onSurfaceVariant,
+        )
+        drawCardinals(layouts = layouts, centerX = cx, centerY = cy, radius = roseRadius * 0.82f)
+        if (targetAngle != null) {
+            drawTargetLine(
                 centerX = cx,
                 centerY = cy,
-                outerRadius = roseRadius * 0.99f,
-                majorColor = onSurface,
-                minorColor = onSurfaceVariant,
+                radius = roseRadius * 0.90f,
+                angleDeg = targetAngle,
+                color = targetColor,
             )
-            drawCardinals(
-                layouts = cardinalLayouts,
-                centerX = cx,
-                centerY = cy,
-                radius = roseRadius * 0.82f,
-            )
-
-            // Target line — rotates with the rose so it stays locked to the cardinal
-            // direction the user chose, regardless of the phone's orientation.
-            if (targetAngle != null) {
-                drawTargetLine(
-                    centerX = cx,
-                    centerY = cy,
-                    radius = roseRadius * 0.90f,
-                    angleDeg = targetAngle,
-                    color = targetColor,
-                )
-            }
         }
+    }
+}
 
-        // Fixed top layer: needle + hub + heading-pointer triangle.
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val w = size.width
-            val h = size.height
-            val cx = w / 2f
-            val cy = h / 2f
-            val roseRadius = minOf(w, h) / 2f - 14.dp.toPx()
-
-            val needleLen = roseRadius * 0.70f
-            val needleHalfWidth = roseRadius * 0.045f
-            drawNeedle(
-                centerX = cx,
-                centerY = cy,
-                length = needleLen,
-                halfWidth = needleHalfWidth,
-                northColor = needleNorth,
-                southColor = needleSouth,
-            )
-
-            drawCircle(color = primary, radius = roseRadius * 0.045f, center = Offset(cx, cy))
-            drawCircle(color = onPrimary, radius = roseRadius * 0.018f, center = Offset(cx, cy))
-
-            val tipY = cy - roseRadius - 4.dp.toPx()
-            val trianglePath = ComposePath().apply {
-                moveTo(cx, tipY - 10.dp.toPx())
-                lineTo(cx - 10.dp.toPx(), tipY + 8.dp.toPx())
-                lineTo(cx + 10.dp.toPx(), tipY + 8.dp.toPx())
-                close()
-            }
-            drawPath(trianglePath, color = primary)
+@Composable
+private fun RoseNeedleLayer(needleNorth: Color, needleSouth: Color, primary: Color, onPrimary: Color) {
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val roseRadius = roseRadiusPx()
+        val cx = size.width / 2f
+        val cy = size.height / 2f
+        drawNeedle(
+            centerX = cx,
+            centerY = cy,
+            length = roseRadius * 0.70f,
+            halfWidth = roseRadius * 0.045f,
+            northColor = needleNorth,
+            southColor = needleSouth,
+        )
+        drawCircle(color = primary, radius = roseRadius * 0.045f, center = Offset(cx, cy))
+        drawCircle(color = onPrimary, radius = roseRadius * 0.018f, center = Offset(cx, cy))
+        val tipY = cy - roseRadius - 4.dp.toPx()
+        val trianglePath = ComposePath().apply {
+            moveTo(cx, tipY - 10.dp.toPx())
+            lineTo(cx - 10.dp.toPx(), tipY + 8.dp.toPx())
+            lineTo(cx + 10.dp.toPx(), tipY + 8.dp.toPx())
+            close()
         }
+        drawPath(trianglePath, color = primary)
     }
 }
 
@@ -257,49 +275,6 @@ private fun Responsiveness.toSpringSpec(): AnimationSpec<Float> = when (this) {
     )
 }
 
-private fun DrawScope.drawTargetLine(centerX: Float, centerY: Float, radius: Float, angleDeg: Float, color: Color) {
-    // angle 0° points north (up); x-axis in screen coords goes right.
-    rotate(degrees = angleDeg, pivot = Offset(centerX, centerY)) {
-        drawLine(
-            color = color.copy(alpha = 0.95f),
-            start = Offset(centerX, centerY),
-            end = Offset(centerX, centerY - radius),
-            strokeWidth = 4.dp.toPx(),
-            cap = StrokeCap.Round,
-        )
-        // Small arrowhead at the tip for directionality.
-        val tip = Offset(centerX, centerY - radius)
-        val path = ComposePath().apply {
-            moveTo(tip.x, tip.y - 4.dp.toPx())
-            lineTo(tip.x - 7.dp.toPx(), tip.y + 6.dp.toPx())
-            lineTo(tip.x + 7.dp.toPx(), tip.y + 6.dp.toPx())
-            close()
-        }
-        drawPath(path, color = color)
-    }
-}
-
-private fun DrawScope.drawTicks(centerX: Float, centerY: Float, outerRadius: Float, majorColor: Color, minorColor: Color) {
-    val majorLen = outerRadius * 0.12f
-    val minorLen = outerRadius * 0.055f
-    for (i in 0 until 72) {
-        val angleDeg = i * 5f
-        val isMajor = angleDeg % 15f == 0f
-        val len = if (isMajor) majorLen else minorLen
-        val color = if (isMajor) majorColor else minorColor
-        val strokeWidth = if (isMajor) 3.dp.toPx() else 1.5.dp.toPx()
-        rotate(degrees = angleDeg, pivot = Offset(centerX, centerY)) {
-            drawLine(
-                color = color,
-                start = Offset(centerX, centerY - outerRadius),
-                end = Offset(centerX, centerY - outerRadius + len),
-                strokeWidth = strokeWidth,
-                cap = StrokeCap.Round,
-            )
-        }
-    }
-}
-
 @Immutable
 internal data class CardinalMarker(val label: String, val angle: Float, val main: Boolean)
 
@@ -314,20 +289,6 @@ internal val CardinalMarkers: List<CardinalMarker> = listOf(
     CardinalMarker("NW", 315f, false),
 )
 
-private fun DrawScope.drawCardinals(
-    layouts: List<Pair<CardinalMarker, androidx.compose.ui.text.TextLayoutResult>>,
-    centerX: Float,
-    centerY: Float,
-    radius: Float,
-) {
-    for ((marker, layout) in layouts) {
-        val rad = Math.toRadians((marker.angle - 90.0))
-        val x = centerX + (radius * cos(rad)).toFloat() - layout.size.width / 2f
-        val y = centerY + (radius * sin(rad)).toFloat() - layout.size.height / 2f
-        drawText(textLayoutResult = layout, topLeft = Offset(x, y))
-    }
-}
-
 @Composable
 private fun pulsingRingColor(base: Color, pulse: Color): Color {
     val transition = rememberInfiniteTransition(label = "calibrationPulse")
@@ -341,22 +302,4 @@ private fun pulsingRingColor(base: Color, pulse: Color): Color {
         label = "calibrationPulseAlpha",
     )
     return androidx.compose.ui.graphics.lerp(base, pulse, alpha)
-}
-
-private fun DrawScope.drawNeedle(centerX: Float, centerY: Float, length: Float, halfWidth: Float, northColor: Color, southColor: Color) {
-    val northPath = ComposePath().apply {
-        moveTo(centerX, centerY - length)
-        lineTo(centerX - halfWidth, centerY)
-        lineTo(centerX + halfWidth, centerY)
-        close()
-    }
-    drawPath(northPath, color = northColor)
-
-    val southPath = ComposePath().apply {
-        moveTo(centerX, centerY + length)
-        lineTo(centerX - halfWidth, centerY)
-        lineTo(centerX + halfWidth, centerY)
-        close()
-    }
-    drawPath(southPath, color = southColor)
 }

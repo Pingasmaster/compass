@@ -22,7 +22,7 @@ import androidx.compose.ui.platform.LocalContext
  *   fallback scheme when dynamic is disabled.
  * - Colours animate on theme/scheme change with a two-speed spec:
  *   accent slots fade fast, surface/background slots fade slowly so a
- *   light ↔ dark flip doesn't flash.
+ *   light <-> dark flip doesn't flash.
  * - OLED-black variant blends existing surfaces toward pure black so the
  *   underlying seed/dynamic hue isn't lost.
  * - [motionScheme] is overridable in case a caller wants to A/B a different

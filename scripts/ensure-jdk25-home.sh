@@ -15,8 +15,8 @@ _ENSURE_JDK25_REPO_ROOT="$(cd "$_ENSURE_JDK25_SCRIPT_DIR/.." && pwd)"
 WRAPPER_ROOT="$_ENSURE_JDK25_REPO_ROOT/.jdk25-home"
 
 resolve_real_jdk() {
-    if [[ -n "${COMPASS_REAL_JAVA_HOME:-}" && -x "${COMPASS_REAL_JAVA_HOME}/bin/java" ]]; then
-        echo "$COMPASS_REAL_JAVA_HOME"
+    if [[ -n "${ANDROID_APP_REAL_JAVA_HOME:-}" && -x "${ANDROID_APP_REAL_JAVA_HOME}/bin/java" ]]; then
+        echo "$ANDROID_APP_REAL_JAVA_HOME"
         return
     fi
     # Prefer an already-selected real JDK 25 (CI setup-java, user JAVA_HOME),
@@ -76,7 +76,7 @@ EOF
     echo "$REAL_JDK" > "$MARKER"
 fi
 
-export COMPASS_REAL_JAVA_HOME="$REAL_JDK"
+export ANDROID_APP_REAL_JAVA_HOME="$REAL_JDK"
 export JAVA_HOME="$WRAPPER_ROOT"
 export PATH="$JAVA_HOME/bin:$PATH"
 unset _ENSURE_JDK25_SCRIPT_DIR _ENSURE_JDK25_REPO_ROOT

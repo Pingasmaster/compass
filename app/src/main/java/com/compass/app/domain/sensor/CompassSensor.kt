@@ -52,7 +52,7 @@ class CompassSensor(context: Context) {
             location.latitude.toFloat(),
             location.longitude.toFloat(),
             location.altitude.toFloat(),
-            // Prefer the fix time where available — `GeomagneticField` interprets the
+            // Prefer the fix time where available - `GeomagneticField` interprets the
             // millis as "time for which to compute the field", which conceptually matches
             // when the location was observed, not now.
             if (location.time > 0L) location.time else System.currentTimeMillis(),

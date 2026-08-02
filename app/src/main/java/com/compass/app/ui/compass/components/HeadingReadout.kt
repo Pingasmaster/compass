@@ -46,7 +46,7 @@ fun HeadingReadout(
     targetHitColor: Color = MaterialTheme.colorScheme.tertiary,
 ) {
     // Unwrap to a cumulative angle so animateFloatAsState takes the shortest path
-    // across the 0°/360° seam; then normalise back to [0,360) for display. The
+    // across the 0 deg/360 deg seam; then normalise back to [0,360) for display. The
     // unwrap is written in a LaunchedEffect instead of during composition so we
     // don't invalidate the scope that just read the state (which previously
     // forced an extra recomposition every sensor tick).
@@ -64,7 +64,7 @@ fun HeadingReadout(
     val display = ((animated.roundToInt() % 360) + 360) % 360
     val cardinal = animated.toCardinal()
 
-    // Proximity factor: 1f at target, 0f at ≥10° off. Below-threshold angles tint
+    // Proximity factor: 1f at target, 0f at ?10 deg off. Below-threshold angles tint
     // the heading number toward targetHitColor via color lerp.
     val defaultHeadingColor = LocalContentColor.current
     val proximity = targetAngle?.let { t ->
@@ -84,7 +84,7 @@ fun HeadingReadout(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        // Plain integer readout — the underlying float is motion-scheme-animated
+        // Plain integer readout - the underlying float is motion-scheme-animated
         // so digits change smoothly without per-change slide animations flickering.
         Row(
             verticalAlignment = Alignment.Bottom,
@@ -97,7 +97,7 @@ fun HeadingReadout(
                 modifier = Modifier.widthIn(min = 168.dp),
             )
             Text(
-                text = "°",
+                text = " deg",
                 style = MaterialTheme.typography.displayMedium,
                 color = if (targetAngle == null) {
                     MaterialTheme.colorScheme.primary
@@ -108,7 +108,7 @@ fun HeadingReadout(
             )
         }
 
-        // Cardinal label jumps discretely every ~22.5° — AnimatedContent fits here
+        // Cardinal label jumps discretely every ~22.5 deg - AnimatedContent fits here
         // because changes are rare enough that the slide/fade finishes before the next.
         AnimatedContent(
             targetState = cardinal,

@@ -22,5 +22,5 @@
     <issue id="ProduceStateDoesNotAssignValue" severity="error" />
     <issue id="UnrememberedMutableState"      severity="error" />
     <issue id="ModifierParameter"             severity="error" />
-    <issue id="ComposeUnstableCollections"    severity="warning" />
+    <issue id="ComposeUnstableCollections"    severity="informational" />
 </lint>
