@@ -12,7 +12,6 @@
 #   ./build.sh --build-health     # full build + dependency-analysis buildHealth report
 #   ./build.sh --smoke            # GMD Pixel 7a API 37 @SmokeTest (future)
 #   ./build.sh --smoke-shipped    # :shippedsmoke release lane (future)
-#   ./build.sh --baseline-profile # regenerate baseline profiles via GMD + exit
 #   ./build.sh --macrobenchmark   # advisory emulator macrobenchmarks (future)
 #   ./build.sh --publish          # serve existing root APKs over NetBird HTTP + exit
 #
@@ -63,7 +62,6 @@ DO_FORMAT=0
 DO_BUILD_HEALTH=0
 DO_SMOKE=0
 DO_SMOKE_SHIPPED=0
-DO_BASELINE_PROFILE=0
 DO_MACROBENCHMARK=0
 DO_PUBLISH=0
 DO_DEBUG=0
@@ -79,13 +77,12 @@ for arg in "$@"; do
         --build-health)      DO_BUILD_HEALTH=1 ;;
         --smoke)             DO_SMOKE=1 ;;
         --smoke-shipped)     DO_SMOKE_SHIPPED=1 ;;
-        --baseline-profile)  DO_BASELINE_PROFILE=1 ;;
         --macrobenchmark)    DO_MACROBENCHMARK=1 ;;
         --publish)           DO_PUBLISH=1 ;;
         --debug)             DO_DEBUG=1 ;;
         *)
             echo "Unknown arg: $arg (accepted: --clean, --format, --build-health," \
-                "--smoke, --smoke-shipped, --baseline-profile, --macrobenchmark," \
+                "--smoke, --smoke-shipped, --macrobenchmark," \
                 "--publish, --debug)" >&2
             exit 2
             ;;
@@ -157,14 +154,6 @@ if [[ "$DO_SMOKE_SHIPPED" -eq 1 ]]; then
     ./gradlew :shippedsmoke:pixel7aApi37FutureReleaseAndroidTest "${GMD_GPU[@]}"
     ./scripts/assert_tests_ran.sh 1 shippedsmoke
     echo "Shipped smoke complete."
-    exit 0
-fi
-
-if [[ "$DO_BASELINE_PROFILE" -eq 1 ]]; then
-    acquire_lock
-    regenerate_baseline_profiles
-    echo "Baseline profile regeneration complete."
-    echo "Re-run ./build.sh (full release path) so assembleRelease packages them."
     exit 0
 fi
 
