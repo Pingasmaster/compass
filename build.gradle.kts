@@ -54,6 +54,11 @@ tasks.register<JavaExec>("ktlintCheck") {
     )
     classpath = ktlintCli
     mainClass.set("com.pinterest.ktlint.Main")
+    // ktlint-cli's shadowed jar embeds the IntelliJ PSI parser, which calls
+    // the terminally deprecated sun.misc.Unsafe::objectFieldOffset. Opt in
+    // here rather than relying on build.sh exporting JAVA_TOOL_OPTIONS, so a
+    // bare ./gradlew ktlintCheck is warning-free too.
+    jvmArgs("--sun-misc-unsafe-memory-access=allow", "--enable-native-access=ALL-UNNAMED")
     workingDir = rootDir
     args(ktlintInputPatterns + "--relative")
 }
@@ -68,6 +73,11 @@ tasks.register<JavaExec>("ktlintFormat") {
     )
     classpath = ktlintCli
     mainClass.set("com.pinterest.ktlint.Main")
+    // ktlint-cli's shadowed jar embeds the IntelliJ PSI parser, which calls
+    // the terminally deprecated sun.misc.Unsafe::objectFieldOffset. Opt in
+    // here rather than relying on build.sh exporting JAVA_TOOL_OPTIONS, so a
+    // bare ./gradlew ktlintCheck is warning-free too.
+    jvmArgs("--sun-misc-unsafe-memory-access=allow", "--enable-native-access=ALL-UNNAMED")
     workingDir = rootDir
     args(listOf("-F") + ktlintInputPatterns + "--relative")
 }
