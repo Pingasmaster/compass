@@ -1,7 +1,7 @@
 [versions]
 agp = "9.4.0-alpha07"
 desugar-jdk-libs = "2.1.5"
-kotlin-compose = "2.4.10"
+kotlin-compose = "2.4.20-Beta2"
 leakcanary = "3.0-alpha-9"
 
 # The Compose BOM pins every androidx.compose.* artefact. The explicit
@@ -42,10 +42,6 @@ compose-rules = "0.6.3"
 slack-lint-checks = "0.11.1"
 slack-compose-lints = "1.5.3"
 dependency-analysis = "3.18.0"
-
-# Pin slf4j-api to 2.0.18 to avoid LinkageError with Gradle 9.4+ Tooling API.
-# See https://github.com/gradle/gradle/issues/37947
-slf4j = "2.0.18"
 
 # JDK toolchain target. AGP 9.x requires JDK 17+; we build and run on JDK 25.
 jvmTarget = "25"
@@ -93,9 +89,6 @@ androidx-test-uiautomator = { module = "androidx.test.uiautomator:uiautomator", 
 errorprone-annotations = { module = "com.google.errorprone:error_prone_annotations", version.ref = "errorprone-annotations" }
 
 leakcanary-android = { group = "com.squareup.leakcanary", name = "leakcanary-android", version.ref = "leakcanary" }
-
-# Pinned slf4j-api to 2.0.17 to match Gradle 9.4+ Tooling API expectation.
-slf4j-api = { group = "org.slf4j", name = "slf4j-api", version.ref = "slf4j" }
 
 detekt-compose = { module = "io.nlopez.compose.rules:detekt", version.ref = "compose-rules" }
 lint-slack-checks = { module = "com.slack.lint:slack-lint-checks", version.ref = "slack-lint-checks" }

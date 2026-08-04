@@ -7,6 +7,10 @@ plugins {
 android {
     namespace = "com.compass.app"
     compileSdk = 37
+    // Compile against the 37.1 minor SDK release (API additions only; minor
+    // SDKs carry no behavior changes and cannot be targeted - targetSdk
+    // stays at the 37 major). Matches calc / Brisky / dustvalve / STT.
+    compileSdkMinor = 1
 
     // Shared by defaultConfig + future flavor offset. build.sh bumps this
     // via sed; future re-reads it on the next Gradle configure.

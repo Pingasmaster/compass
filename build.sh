@@ -14,6 +14,13 @@
 #   ./build.sh --smoke-shipped    # :shippedsmoke release lane (future)
 #   ./build.sh --macrobenchmark   # advisory emulator macrobenchmarks (future)
 #   ./build.sh --publish          # serve existing root APKs over NetBird HTTP + exit
+#   ./build.sh --continue-without-updates
+#                                 # skip the pre-build dependency freshness gate
+#
+# Every build mode first runs scripts/check_latest_deps.py, which aborts the
+# build when any version in gradle/libs.versions.toml is behind the newest
+# release published to Google Maven / Maven Central / the Gradle Plugin Portal.
+# Pre-releases count: alphas, betas and RCs are all valid "latest" targets.
 #
 # After a successful full build, scripts/apk_http_serve.sh publishes both
 # http://<netbird-fqdn>:8765/app-release.apk (compat, Android 8+) and
@@ -65,6 +72,7 @@ DO_SMOKE_SHIPPED=0
 DO_MACROBENCHMARK=0
 DO_PUBLISH=0
 DO_DEBUG=0
+SKIP_DEP_CHECK=0
 
 ROOT_APK="app-release.apk"
 ROOT_MAPPING="app-release-mapping.txt"
@@ -80,14 +88,35 @@ for arg in "$@"; do
         --macrobenchmark)    DO_MACROBENCHMARK=1 ;;
         --publish)           DO_PUBLISH=1 ;;
         --debug)             DO_DEBUG=1 ;;
+        --continue-without-updates) SKIP_DEP_CHECK=1 ;;
         *)
             echo "Unknown arg: $arg (accepted: --clean, --format, --build-health," \
                 "--smoke, --smoke-shipped, --macrobenchmark," \
-                "--publish, --debug)" >&2
+                "--publish, --debug, --continue-without-updates)" >&2
             exit 2
             ;;
     esac
 done
+
+# Refuse to build on stale dependencies. scripts/check_latest_deps.py resolves
+# every referenced key in gradle/libs.versions.toml against Google Maven,
+# Maven Central and the Gradle Plugin Portal, counting alphas/betas/RCs, and
+# exits non-zero naming anything that is behind. Escape hatches: a
+# "# hold: <reason>" comment on the catalog line, or --continue-without-updates.
+check_dependency_freshness() {
+    if [[ "$SKIP_DEP_CHECK" -eq 1 ]]; then
+        echo "Dependency freshness check skipped (--continue-without-updates)."
+        return 0
+    fi
+    if ! python3 ./scripts/check_latest_deps.py; then
+        echo "ERROR: dependencies are not on their latest versions (see above)." >&2
+        exit 1
+    fi
+}
+
+if [[ "$DO_PUBLISH" -eq 0 && "$DO_CLEAN_ONLY" -eq 0 && "$DO_FORMAT" -eq 0 ]]; then
+    check_dependency_freshness
+fi
 
 acquire_lock() {
     local lock_dir="${XDG_CACHE_HOME:-$HOME/.cache}/android-apps"
