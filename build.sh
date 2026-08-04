@@ -276,6 +276,31 @@ if [[ "$DO_BUILD_HEALTH" -eq 1 ]]; then
     [[ -f "$REPORT" ]] && echo "Dependency-analysis report: $REPORT"
 fi
 
+# Archive R8 mappings keyed by flavor+versionCode BEFORE the root copies are
+# overwritten: devices in the field run historical versionCodes, and without
+# the archive their stack traces become permanently un-deobfuscatable after
+# the next build. mappings/ is gitignored but must never be deleted.
+MAPPINGS_DIR="mappings"
+if [[ ! -d "$MAPPINGS_DIR" ]]; then
+    # One-time salvage of pre-archive root mappings (versionCode unknown).
+    mkdir -p "$MAPPINGS_DIR"
+    for prev in "$ROOT_MAPPING" "$ROOT_MAPPING_FUTURE"; do
+        if [[ -f "$prev" ]]; then
+            cp "$prev" "$MAPPINGS_DIR/unversioned-$(date +%Y%m%d%H%M%S)-$prev"
+        fi
+    done
+fi
+BUILT_CODE=$(sed -n 's/.*val baseVersionCode = \([0-9][0-9]*\).*/\1/p' "$BUILD_GRADLE" | head -1)
+if [[ -n "$BUILT_CODE" ]]; then
+    if [[ -f "$GRADLE_MAPPING_COMPAT" ]]; then
+        cp "$GRADLE_MAPPING_COMPAT" "$MAPPINGS_DIR/compat-${BUILT_CODE}-mapping.txt"
+    fi
+    if [[ -f "$GRADLE_MAPPING_FUTURE" ]]; then
+        cp "$GRADLE_MAPPING_FUTURE" "$MAPPINGS_DIR/future-$((1000000 + BUILT_CODE))-mapping.txt"
+    fi
+    echo "Archived R8 mappings for versionCode $BUILT_CODE under $MAPPINGS_DIR/."
+fi
+
 rm -f "$ROOT_APK" "$ROOT_MAPPING" "$ROOT_APK_FUTURE" "$ROOT_MAPPING_FUTURE"
 cp "$GRADLE_APK_COMPAT" "$ROOT_APK"
 echo "Copied compat release APK to $ROOT_APK"
@@ -289,6 +314,17 @@ if [[ -f "$GRADLE_MAPPING_FUTURE" ]]; then
     cp "$GRADLE_MAPPING_FUTURE" "$ROOT_MAPPING_FUTURE"
     echo "Copied future release mapping to $ROOT_MAPPING_FUTURE"
 fi
+
+echo "" >&2
+echo "##################################################################" >&2
+echo "# WARNING: these release APKs are signed with the DEBUG keystore #" >&2
+echo "# (~/.android/debug.keystore, well-known password). Anyone with  #" >&2
+echo "# that key can push valid updates to every device that installed #" >&2
+echo "# from this pipeline, and a regenerated keystore strands them.   #" >&2
+echo "# Wire a real release signingConfig before wider distribution    #" >&2
+echo "# (see app/build.gradle.kts, buildTypes.release).                #" >&2
+echo "##################################################################" >&2
+echo "" >&2
 
 # Serve both flavor APKs (compat + future).
 ./scripts/apk_http_serve.sh start "$ROOT_APK" "$ROOT_APK_FUTURE"

@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.combine
+import kotlin.math.roundToInt
 
 /**
  * Wraps [SensorManager] for a compass. Prefers TYPE_ROTATION_VECTOR (gyro+accel+mag fusion),
@@ -129,12 +130,20 @@ class CompassSensor(context: Context) {
                 val rawAzimuthDeg = Math.toDegrees(orientation[0].toDouble()).toFloat()
                 val smoothed = smoother.update(rawAzimuthDeg)
 
-                latest = latest.copy(
-                    azimuth = smoothed,
-                    pitch = Math.toDegrees(orientation[1].toDouble()).toFloat(),
-                    roll = Math.toDegrees(orientation[2].toDouble()).toFloat(),
+                // Quantize to 0.1 deg and drop unchanged readings: the EMA output
+                // jitters slightly on every ~20 ms event even when the device is
+                // motionless, and forwarding each tick keeps the whole UI tree
+                // recomposing ~50x/s. Sub-0.1-degree changes are invisible - the
+                // rose spring animation smooths far coarser steps than that.
+                val next = latest.copy(
+                    azimuth = quantizeDegrees(smoothed),
+                    pitch = quantizeDegrees(Math.toDegrees(orientation[1].toDouble()).toFloat()),
+                    roll = quantizeDegrees(Math.toDegrees(orientation[2].toDouble()).toFloat()),
                 )
-                trySend(latest)
+                if (next != latest) {
+                    latest = next
+                    trySend(latest)
+                }
             }
 
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
@@ -150,6 +159,8 @@ class CompassSensor(context: Context) {
         }
     }
 
+    private fun quantizeDegrees(value: Float): Float = (value * DEGREE_QUANTIZATION).roundToInt() / DEGREE_QUANTIZATION
+
     private fun currentDisplayRotation(): Int {
         // DisplayManager is safe to query from the application context, unlike
         // Context.getDisplay() which throws UnsupportedOperationException there.
@@ -157,5 +168,10 @@ class CompassSensor(context: Context) {
         // wrong on foldables / external-display activities. Fine for phones.
         val display = displayManager?.getDisplay(Display.DEFAULT_DISPLAY)
         return display?.rotation ?: Surface.ROTATION_0
+    }
+
+    private companion object {
+        // 1/step: 10f quantizes degrees to 0.1-degree steps.
+        const val DEGREE_QUANTIZATION = 10f
     }
 }

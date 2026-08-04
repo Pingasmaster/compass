@@ -45,6 +45,9 @@ Thumbs.db
 *.aab
 /app/release/
 /mapping/
+# Per-versionCode R8 mapping archive (build.sh); gitignored but NEVER deleted,
+# it is the only way to deobfuscate stack traces from already-shipped builds.
+/mappings/
 
 # Signing keys - never commit
 *.jks

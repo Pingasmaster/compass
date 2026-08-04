@@ -11,7 +11,6 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,7 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -162,10 +161,12 @@ private fun AccuracyDot(color: Color) {
         ),
         label = "accuracyDotAlpha",
     )
+    // The animated alpha is read inside drawBehind so each pulse frame only
+    // invalidates the draw phase; reading it in composition would recompose
+    // this always-visible top-bar dot on every frame, forever.
     Box(
         modifier = Modifier
             .size(8.dp)
-            .clip(CircleShape)
-            .background(color.copy(alpha = alpha)),
+            .drawBehind { drawCircle(color.copy(alpha = alpha)) },
     )
 }

@@ -21,6 +21,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -50,9 +52,15 @@ fun HeadingReadout(
     // unwrap is written in a LaunchedEffect instead of during composition so we
     // don't invalidate the scope that just read the state (which previously
     // forced an extra recomposition every sensor tick).
+    // rememberUpdatedState + snapshotFlow (same pattern as CompassRose) keeps one
+    // long-lived coroutine instead of keying the effect on the ~50 Hz azimuth,
+    // which would cancel and relaunch a coroutine on every sensor tick.
     val cumulative = remember { mutableFloatStateOf(azimuthDegrees) }
-    LaunchedEffect(azimuthDegrees) {
-        cumulative.floatValue = unwrapAngle(cumulative.floatValue, azimuthDegrees)
+    val latestAzimuth by rememberUpdatedState(azimuthDegrees)
+    LaunchedEffect(Unit) {
+        snapshotFlow { latestAzimuth }.collect { value ->
+            cumulative.floatValue = unwrapAngle(cumulative.floatValue, value)
+        }
     }
 
     val motionScheme = MaterialTheme.motionScheme
@@ -128,24 +136,36 @@ fun HeadingReadout(
             )
         }
 
-        val baseSubtitle = if (isTrueNorth) {
-            stringResource(R.string.true_north_declination, "%+.1f".format(declination))
-        } else {
-            stringResource(R.string.magnetic_north)
-        }
-        val subtitle = if (targetAngle != null) {
-            val normalisedTarget = ((targetAngle.toInt() % 360) + 360) % 360
-            stringResource(R.string.target_prefix, normalisedTarget, baseSubtitle)
-        } else {
-            baseSubtitle
-        }
-        Text(
-            text = subtitle,
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp),
+        HeadingSubtitle(
+            isTrueNorth = isTrueNorth,
+            declination = declination,
+            targetAngle = targetAngle,
         )
     }
+}
+
+// Extracted so the locale-aware String.format and resource lookups skip while
+// the parent's per-frame `animated` read re-runs the HeadingReadout body:
+// these inputs change rarely, so strong skipping isolates them.
+@Composable
+private fun HeadingSubtitle(isTrueNorth: Boolean, declination: Float, targetAngle: Float?) {
+    val baseSubtitle = if (isTrueNorth) {
+        stringResource(R.string.true_north_declination, "%+.1f".format(declination))
+    } else {
+        stringResource(R.string.magnetic_north)
+    }
+    val subtitle = if (targetAngle != null) {
+        val normalisedTarget = ((targetAngle.toInt() % 360) + 360) % 360
+        stringResource(R.string.target_prefix, normalisedTarget, baseSubtitle)
+    } else {
+        baseSubtitle
+    }
+    Text(
+        text = subtitle,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 4.dp),
+    )
 }
 
 private fun shortestAngularDiff(from: Float, to: Float): Float {

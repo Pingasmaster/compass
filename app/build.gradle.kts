@@ -107,6 +107,17 @@ android {
     }
 }
 
+// Opt-in skippability evidence: run any compile task with -PcomposeReports to
+// get <variant>-composables.txt / -classes.txt under app/build/compose_reports
+// (catches regressions like unskippable or frozen derived state in review).
+// Gated on a property so normal builds stay configuration-cache friendly.
+composeCompiler {
+    if (project.hasProperty("composeReports")) {
+        reportsDestination = layout.buildDirectory.dir("compose_reports")
+        metricsDestination = layout.buildDirectory.dir("compose_metrics")
+    }
+}
+
 detekt {
     buildUponDefaultConfig = true
     allRules = false

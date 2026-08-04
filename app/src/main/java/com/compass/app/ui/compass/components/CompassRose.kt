@@ -27,6 +27,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
@@ -69,17 +70,15 @@ fun CompassRose(
     }
 
     val colors = rememberRoseColors(isDark = isDark)
-    val ringColor = if (calibrating) {
-        pulsingRingColor(base = colors.outlineVariant, pulse = colors.error)
-    } else {
-        colors.outlineVariant
-    }
+    val ringPulseAlpha = calibrationPulseAlpha(calibrating = calibrating)
     val cardinalLayouts = rememberCardinalLayouts(colors = colors)
 
     Box(modifier = modifier) {
         RoseBaseLayer(
             surfaceContainer = colors.surfaceContainer,
-            ringColor = ringColor,
+            ringBase = colors.outlineVariant,
+            ringPulse = colors.error,
+            ringPulseAlpha = ringPulseAlpha,
         )
         RoseRotatingLayer(
             rotationDegrees = { cumulativeAngle.value },
@@ -169,13 +168,15 @@ private fun rememberCardinalLayouts(colors: RoseColors): List<Pair<CardinalMarke
 }
 
 @Composable
-private fun RoseBaseLayer(surfaceContainer: Color, ringColor: Color) {
+private fun RoseBaseLayer(surfaceContainer: Color, ringBase: Color, ringPulse: Color, ringPulseAlpha: () -> Float) {
+    // ringPulseAlpha is invoked inside the draw block so the per-frame
+    // calibration pulse only invalidates draw, never composition.
     Canvas(modifier = Modifier.fillMaxSize()) {
         val roseRadius = roseRadiusPx()
         val center = Offset(size.width / 2f, size.height / 2f)
         drawCircle(color = surfaceContainer, radius = roseRadius, center = center)
         drawCircle(
-            color = ringColor,
+            color = lerp(ringBase, ringPulse, ringPulseAlpha()),
             radius = roseRadius,
             center = center,
             style = Stroke(width = 2.dp.toPx()),
@@ -289,8 +290,17 @@ internal val CardinalMarkers: List<CardinalMarker> = listOf(
     CardinalMarker("NW", 315f, false),
 )
 
+private val NoPulse: () -> Float = { 0f }
+
+/**
+ * Returns a provider for the calibration pulse alpha. The animated value is
+ * deliberately NOT read here: reading an infinite-transition value during
+ * composition would invalidate the caller's whole scope every frame. Callers
+ * must invoke the lambda from the draw phase only.
+ */
 @Composable
-private fun pulsingRingColor(base: Color, pulse: Color): Color {
+private fun calibrationPulseAlpha(calibrating: Boolean): () -> Float {
+    if (!calibrating) return NoPulse
     val transition = rememberInfiniteTransition(label = "calibrationPulse")
     val alpha by transition.animateFloat(
         initialValue = 0f,
@@ -301,5 +311,5 @@ private fun pulsingRingColor(base: Color, pulse: Color): Color {
         ),
         label = "calibrationPulseAlpha",
     )
-    return androidx.compose.ui.graphics.lerp(base, pulse, alpha)
+    return { alpha }
 }

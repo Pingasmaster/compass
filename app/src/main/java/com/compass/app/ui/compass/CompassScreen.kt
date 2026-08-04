@@ -11,11 +11,9 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -34,7 +32,6 @@ import com.compass.app.ui.compass.components.CompassTopBar
 import com.compass.app.ui.compass.components.DualPaneCompassBody
 import com.compass.app.ui.compass.components.SinglePaneCompassBody
 import com.compass.app.ui.compass.components.TargetAngleSheet
-import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -45,7 +42,6 @@ fun CompassScreen(
     viewModel: CompassViewModel = viewModel(factory = CompassViewModel.Factory),
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val prefs = viewModel.prefs
 
     val reading by viewModel.readings.collectAsStateWithLifecycle()
@@ -55,19 +51,24 @@ fun CompassScreen(
     )
     val targetAngle by viewModel.targetAngle.collectAsStateWithLifecycle()
 
-    var showSettings by remember { mutableStateOf(false) }
-    var showTargetDialog by remember { mutableStateOf(false) }
+    // rememberSaveable so an open sheet survives rotation / process death.
+    var showSettings by rememberSaveable { mutableStateOf(false) }
+    var showTargetDialog by rememberSaveable { mutableStateOf(false) }
 
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
     ) { granted ->
-        scope.launch {
-            prefs.setLocationPrompted(true)
-            prefs.setTrueNorth(granted)
-        }
+        // Persisted in viewModelScope: the writes must not be cancelled if the
+        // composition goes away right after the system permission dialog.
+        viewModel.onLocationPermissionResult(granted)
     }
 
-    CompassTrueNorthPromptEffect(prefs, context, locationPermissionLauncher)
+    CompassTrueNorthPromptEffect(
+        prefs = prefs,
+        context = context,
+        launcher = locationPermissionLauncher,
+        onSkipPrompt = viewModel::markLocationPrompted,
+    )
 
     Scaffold(
         modifier = modifier,
@@ -105,6 +106,7 @@ fun CompassScreen(
         trueNorth = trueNorth,
         responsiveness = responsiveness,
         prefs = prefs,
+        settingsActions = viewModel.settingsActions,
         context = context,
         locationPermissionLauncher = locationPermissionLauncher,
         onTargetConfirm = { value ->
@@ -124,6 +126,7 @@ private fun CompassScreenSheets(
     trueNorth: Boolean,
     responsiveness: Responsiveness,
     prefs: UserPreferences,
+    settingsActions: SettingsActions,
     context: Context,
     locationPermissionLauncher: ActivityResultLauncher<String>,
     onTargetConfirm: (Float?) -> Unit,
@@ -140,6 +143,7 @@ private fun CompassScreenSheets(
     if (showSettings) {
         CompassSettingsHost(
             prefs = prefs,
+            actions = settingsActions,
             trueNorth = trueNorth,
             responsiveness = responsiveness,
             context = context,
@@ -168,18 +172,19 @@ private fun CompassScaffoldBody(
         WindowSizeClass.HEIGHT_DP_EXPANDED_LOWER_BOUND,
     )
 
-    val roseBucket by remember {
-        derivedStateOf {
-            val cardinal = roseAzimuth.toCardinal()
-            val bucketed = ((roseAzimuth / 10f).roundToInt() * 10 + 360) % 360
-            cardinal to bucketed
-        }
-    }
+    // Bucket the azimuth to 10-degree steps so the TalkBack description only
+    // changes on meaningful heading changes. Computed inline: this composable
+    // already recomposes on every azimuth change, and a keyless
+    // remember { derivedStateOf { ... } } over a plain parameter would freeze
+    // at the first composition's value (derivedStateOf only tracks snapshot
+    // state reads, and a captured Float parameter is not one).
+    val roseCardinal = roseAzimuth.toCardinal()
+    val roseBucketed = ((roseAzimuth / 10f).roundToInt() * 10 + 360) % 360
     val roseDescription = pluralStringResource(
         R.plurals.rose_content_description,
-        roseBucket.second,
-        roseBucket.second,
-        roseBucket.first,
+        roseBucketed,
+        roseBucketed,
+        roseCardinal,
     )
 
     val bodyModifier = if (dualPane) {

@@ -38,6 +38,8 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,7 +60,9 @@ fun TargetAngleSheet(currentTarget: Float?, onConfirm: (Float?) -> Unit, onDismi
         initialValue = SheetValue.Hidden,
         enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
     )
-    val sliderState = remember {
+    // rememberSaveable so an in-progress (unconfirmed) bearing survives the
+    // activity recreation that rotating into the dual-pane layout triggers.
+    val sliderState = rememberSaveable(saver = TargetSliderStateSaver) {
         SliderState(
             value = currentTarget?.coerceIn(0f, 360f) ?: 0f,
             valueRange = 0f..360f,
@@ -136,7 +140,7 @@ private fun TargetBearingField(sliderState: SliderState) {
         derivedStateOf { sliderState.value.toInt() }
     }
     var fieldFocused by remember { mutableStateOf(false) }
-    var fieldText by remember { mutableStateOf(sliderValueInt.toString()) }
+    var fieldText by rememberSaveable { mutableStateOf(sliderValueInt.toString()) }
     LaunchedEffect(sliderValueInt) {
         if (!fieldFocused) fieldText = sliderValueInt.toString()
     }
@@ -168,6 +172,12 @@ private fun TargetBearingField(sliderState: SliderState) {
             },
     )
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+private val TargetSliderStateSaver = Saver<SliderState, Float>(
+    save = { it.value },
+    restore = { saved -> SliderState(value = saved, valueRange = 0f..360f) },
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
