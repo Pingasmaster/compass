@@ -7,11 +7,11 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.hardware.display.DisplayManager
-import android.location.Location
 import android.view.Display
 import android.view.Surface
 import com.compass.app.domain.model.CompassAccuracy
 import com.compass.app.domain.model.CompassReading
+import com.compass.app.domain.model.GeoFix
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -27,7 +27,7 @@ import kotlin.math.roundToInt
  * so the sensor only runs while something is observing. True-north and location inputs are
  * MutableStateFlows combined into the output so the ViewModel can update them independently.
  */
-class CompassSensor(context: Context) {
+class CompassSensor(context: Context) : HeadingSource {
 
     private val appContext = context.applicationContext
     private val sensorManager: SensorManager? =
@@ -42,21 +42,21 @@ class CompassSensor(context: Context) {
     private val trueNorth = MutableStateFlow(false)
     private val declination = MutableStateFlow(0f)
 
-    val hasSensor: Boolean get() = rotationSensor != null
+    override val hasSensor: Boolean get() = rotationSensor != null
 
-    fun setTrueNorthEnabled(enabled: Boolean) {
+    override fun setTrueNorthEnabled(enabled: Boolean) {
         trueNorth.value = enabled
     }
 
-    fun updateLocation(location: Location) {
+    override fun updateLocation(fix: GeoFix) {
         declination.value = GeomagneticField(
-            location.latitude.toFloat(),
-            location.longitude.toFloat(),
-            location.altitude.toFloat(),
+            fix.latitude.toFloat(),
+            fix.longitude.toFloat(),
+            fix.altitude.toFloat(),
             // Prefer the fix time where available - `GeomagneticField` interprets the
             // millis as "time for which to compute the field", which conceptually matches
             // when the location was observed, not now.
-            if (location.time > 0L) location.time else System.currentTimeMillis(),
+            if (fix.timeMillis > 0L) fix.timeMillis else System.currentTimeMillis(),
         ).declination
     }
 
@@ -65,7 +65,7 @@ class CompassSensor(context: Context) {
      * on last. Also emits when true-north or declination changes so downstream state
      * reflects toggle changes even without a new sensor event.
      */
-    val readings: Flow<CompassReading> = combine(
+    override val readings: Flow<CompassReading> = combine(
         rawReadings(),
         trueNorth,
         declination,

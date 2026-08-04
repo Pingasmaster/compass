@@ -5,6 +5,7 @@ import android.app.Application
 import android.app.ApplicationExitInfo
 import android.content.ComponentCallbacks2
 import android.util.Log
+import com.compass.app.data.preferences.DataStoreUserPreferences
 import com.compass.app.data.preferences.UserPreferences
 import com.compass.app.util.isAtLeastR
 
@@ -19,7 +20,7 @@ class CompassApplication : Application() {
         // calls and leaked Closeables/Activities during development. Must run before any
         // UI-thread work so the Looper's violation handler is in place for early calls.
         StrictModeBootstrap.init(this)
-        userPreferences = UserPreferences(this)
+        userPreferences = DataStoreUserPreferences(this)
         // Capture previous-process exit reasons on this launch so ANRs, OOMs, and native
         // crashes that happened while the app was dead become visible in logcat instead
         // of just "process died" with no diagnostic. ApplicationExitInfo is API 30+;

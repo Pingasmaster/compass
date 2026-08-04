@@ -1,15 +1,6 @@
 package com.compass.app.ui.compass
 
-import android.Manifest
-import android.annotation.SuppressLint
-import android.content.Context
-import android.content.pm.PackageManager
-import android.location.Location
-import android.location.LocationListener
-import android.location.LocationManager
-import android.os.Bundle
 import androidx.compose.runtime.Immutable
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -17,11 +8,16 @@ import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.compass.app.CompassApplication
+import com.compass.app.data.location.AndroidLocationProvider
+import com.compass.app.data.location.AndroidPermissionChecker
 import com.compass.app.data.preferences.Responsiveness
 import com.compass.app.data.preferences.ThemeMode
 import com.compass.app.data.preferences.UserPreferences
+import com.compass.app.domain.location.LocationProvider
+import com.compass.app.domain.location.PermissionChecker
 import com.compass.app.domain.model.CompassReading
 import com.compass.app.domain.sensor.CompassSensor
+import com.compass.app.domain.sensor.HeadingSource
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -52,15 +48,13 @@ class SettingsActions(
     val onResponsivenessChange: (Responsiveness) -> Unit,
 )
 
-class CompassViewModel(val prefs: UserPreferences, appContext: Context, private val savedState: SavedStateHandle) : ViewModel() {
-
-    private val appContext = appContext.applicationContext
-
-    private val sensor = CompassSensor(this.appContext)
-    private val locationManager =
-        this.appContext.getSystemService(LocationManager::class.java)
-
-    private var locationListener: LocationListener? = null
+class CompassViewModel(
+    val prefs: UserPreferences,
+    private val headingSource: HeadingSource,
+    private val locationProvider: LocationProvider,
+    private val permissionChecker: PermissionChecker,
+    private val savedState: SavedStateHandle,
+) : ViewModel() {
 
     // True while the shared readings flow is collecting upstream, i.e. while the
     // UI is (or was within the last 5 s) actually visible. Used to bound the
@@ -70,13 +64,13 @@ class CompassViewModel(val prefs: UserPreferences, appContext: Context, private 
     // Sensor flow - stateIn drives registration via WhileSubscribed. The ViewModel no longer
     // needs onResume/onPause hooks; the composable's `collectAsStateWithLifecycle` controls it.
     val readings: StateFlow<CompassReading> =
-        sensor.readings
+        headingSource.readings
             .onStart { readingsActive.value = true }
             .onCompletion { readingsActive.value = false }
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5_000),
-                initialValue = CompassReading(hasSensor = sensor.hasSensor),
+                initialValue = CompassReading(hasSensor = headingSource.hasSensor),
             )
 
     private val _targetAngle = MutableStateFlow(savedState.get<Float?>(KEY_TARGET_ANGLE))
@@ -117,76 +111,29 @@ class CompassViewModel(val prefs: UserPreferences, appContext: Context, private 
                     // between sessions, or never granted), pull the toggle back to false
                     // so the readout doesn't claim "+0.0 deg declination" while silently
                     // showing magnetic readings.
-                    if (enabled && !hasCoarseLocationPermission()) {
+                    if (enabled && !permissionChecker.hasCoarseLocationPermission()) {
                         prefs.setTrueNorth(false)
                         return@collect
                     }
-                    sensor.setTrueNorthEnabled(enabled)
+                    headingSource.setTrueNorthEnabled(enabled)
                     // Location updates only while the UI is actually collecting
                     // readings: a backgrounded app should not keep an active
                     // LocationManager registration alive.
-                    if (enabled && active) requestLocationIfPermitted() else stopLocationUpdates()
+                    if (enabled && active) {
+                        locationProvider.requestUpdates(headingSource::updateLocation)
+                    } else {
+                        locationProvider.stopUpdates()
+                    }
                 }
         }
     }
 
-    private fun hasCoarseLocationPermission(): Boolean = ContextCompat.checkSelfPermission(
-        appContext,
-        Manifest.permission.ACCESS_COARSE_LOCATION,
-    ) == PackageManager.PERMISSION_GRANTED
-
-    // Permission is re-checked below; the suppression covers the lint pass that
-    // can't follow the guard back to the callsite.
-    @SuppressLint("MissingPermission")
-    private fun requestLocationIfPermitted() {
-        val manager = locationManager ?: return
-        if (!hasCoarseLocationPermission()) return
-        // GPS_PROVIDER requires ACCESS_FINE_LOCATION on API 28+; the app only
-        // declares coarse, so the GPS path would crash with SecurityException.
-        // Network-provider precision is plenty for declination correction.
-        if (!manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) return
-        stopLocationUpdates()
-        val provider = LocationManager.NETWORK_PROVIDER
-        // LocationListener default methods for onStatusChanged /
-        // onProviderEnabled / onProviderDisabled landed in API 29. Compat
-        // runs on API 26-28, so implement all callbacks to avoid
-        // AbstractMethodError when the framework invokes them.
-        val listener = object : LocationListener {
-            override fun onLocationChanged(location: Location) {
-                sensor.updateLocation(location)
-            }
-
-            @Deprecated("Deprecated in Java")
-            override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) = Unit
-
-            override fun onProviderEnabled(provider: String) = Unit
-
-            override fun onProviderDisabled(provider: String) = Unit
-        }
-        locationListener = listener
-        manager.getLastKnownLocation(provider)?.let(sensor::updateLocation)
-        manager.requestLocationUpdates(
-            provider,
-            LOCATION_MIN_TIME_MS,
-            LOCATION_MIN_DISTANCE_M,
-            listener,
-        )
-    }
-
-    private fun stopLocationUpdates() {
-        locationListener?.let { locationManager?.removeUpdates(it) }
-        locationListener = null
-    }
-
     override fun onCleared() {
         // No super call - ViewModel.onCleared is @EmptySuper and lint flags it.
-        stopLocationUpdates()
+        locationProvider.stopUpdates()
     }
 
     companion object {
-        private const val LOCATION_MIN_TIME_MS = 60_000L
-        private const val LOCATION_MIN_DISTANCE_M = 100f
-
         /**
          * Factory that reads [UserPreferences] from [CompassApplication] via
          * [ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] (no Hilt).
@@ -202,9 +149,15 @@ class CompassViewModel(val prefs: UserPreferences, appContext: Context, private 
                     "APPLICATION_KEY missing from CreationExtras"
                 } as CompassApplication
                 val savedState = extras.createSavedStateHandle()
-                return checkNotNull(
-                    modelClass.cast(CompassViewModel(app.userPreferences, app, savedState)),
-                ) {
+                val permissionChecker = AndroidPermissionChecker(app)
+                val viewModel = CompassViewModel(
+                    prefs = app.userPreferences,
+                    headingSource = CompassSensor(app),
+                    locationProvider = AndroidLocationProvider(app, permissionChecker),
+                    permissionChecker = permissionChecker,
+                    savedState = savedState,
+                )
+                return checkNotNull(modelClass.cast(viewModel)) {
                     "Unable to cast ViewModel to ${modelClass.name}"
                 }
             }
