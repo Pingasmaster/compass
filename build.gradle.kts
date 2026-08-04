@@ -12,8 +12,11 @@ plugins {
     id("jvm-toolchains")
 }
 
-// ktlint CLI via JavaExec on JDK 25. build.sh + ensure-jdk25-home.sh inject
-// JEP 498 / native-access opt-in flags so kotlin-compiler-embeddable stays quiet.
+// ktlint CLI via JavaExec on JDK 25. The ktlint-gradle plugin was removed:
+// its worker processes load kotlin-compiler-embeddable into the JDK 25 daemon
+// and emit terminally-deprecated sun.misc.Unsafe::objectFieldOffset WARNINGs
+// (JEP 498) that the daemon's own opt-in flags never reach. Running the CLI in
+// a plain JavaExec keeps that compiler out of the build entirely.
 val ktlintCli = configurations.create("ktlintCli") {
     // ktlint-cli publishes both external and shadowed variants; JavaExec needs
     // the shadowed fat jar (contains com.pinterest.ktlint.Main + deps).
@@ -31,22 +34,17 @@ dependencies {
 
 val javaToolchains = extensions.getByType(JavaToolchainService::class.java)
 
+// Module-list independent on purpose: a newly added module is linted the day
+// it appears, instead of silently escaping until someone updates this list.
 val ktlintInputPatterns = listOf(
     "**/src/**/*.kt",
     "**/src/**/*.kts",
+    "**/*.gradle.kts",
     "*.kts",
-    "build.gradle.kts",
-    "settings.gradle.kts",
-    "app/*.kts",
-    "macrobenchmark/*.kts",
-    "baselineprofile/*.kts",
-    "shippedsmoke/*.kts",
     "!**/build/**",
 )
 
-tasks.register<JavaExec>("ktlintCheck") {
-    group = "verification"
-    description = "Check Kotlin sources with ktlint on JDK 25"
+fun JavaExec.configureKtlint(extraArgs: List<String>) {
     javaLauncher.set(
         javaToolchains.launcherFor {
             languageVersion.set(JavaLanguageVersion.of(25))
@@ -54,30 +52,23 @@ tasks.register<JavaExec>("ktlintCheck") {
     )
     classpath = ktlintCli
     mainClass.set("com.pinterest.ktlint.Main")
-    // ktlint-cli's shadowed jar embeds the IntelliJ PSI parser, which calls
-    // the terminally deprecated sun.misc.Unsafe::objectFieldOffset. Opt in
-    // here rather than relying on build.sh exporting JAVA_TOOL_OPTIONS, so a
-    // bare ./gradlew ktlintCheck is warning-free too.
+    // ktlint-cli's shadowed jar embeds the IntelliJ PSI parser, which calls the
+    // terminally deprecated sun.misc.Unsafe::objectFieldOffset. Opt in here
+    // rather than relying on build.sh exporting JAVA_TOOL_OPTIONS, so a bare
+    // ./gradlew ktlintCheck is warning-free too.
     jvmArgs("--sun-misc-unsafe-memory-access=allow", "--enable-native-access=ALL-UNNAMED")
     workingDir = rootDir
-    args(ktlintInputPatterns + "--relative")
+    args(extraArgs + ktlintInputPatterns + "--relative")
+}
+
+tasks.register<JavaExec>("ktlintCheck") {
+    group = "verification"
+    description = "Check Kotlin sources with ktlint on JDK 25"
+    configureKtlint(emptyList())
 }
 
 tasks.register<JavaExec>("ktlintFormat") {
     group = "formatting"
     description = "Format Kotlin sources with ktlint on JDK 25"
-    javaLauncher.set(
-        javaToolchains.launcherFor {
-            languageVersion.set(JavaLanguageVersion.of(25))
-        },
-    )
-    classpath = ktlintCli
-    mainClass.set("com.pinterest.ktlint.Main")
-    // ktlint-cli's shadowed jar embeds the IntelliJ PSI parser, which calls
-    // the terminally deprecated sun.misc.Unsafe::objectFieldOffset. Opt in
-    // here rather than relying on build.sh exporting JAVA_TOOL_OPTIONS, so a
-    // bare ./gradlew ktlintCheck is warning-free too.
-    jvmArgs("--sun-misc-unsafe-memory-access=allow", "--enable-native-access=ALL-UNNAMED")
-    workingDir = rootDir
-    args(listOf("-F") + ktlintInputPatterns + "--relative")
+    configureKtlint(listOf("-F"))
 }
