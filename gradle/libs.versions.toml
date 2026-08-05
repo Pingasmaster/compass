@@ -37,10 +37,10 @@ errorprone-annotations = "2.50.0"
 # build.gradle.kts. ktlint-gradle was removed: its process workers load
 # kotlin-compiler-embeddable into the JDK 25 daemon and emit JEP 498 WARNINGs.
 ktlint-engine = "1.8.0"
-detekt = "2.0.0-alpha.5"
-compose-rules = "0.6.3"
+detekt = "2.0.0-alpha.6"
+compose-rules = "0.6.4"
 slack-lint-checks = "0.11.1"
-slack-compose-lints = "1.5.3"
+slack-compose-lints = "1.5.4"
 dependency-analysis = "3.18.0"
 
 # JDK toolchain target. AGP 9.x requires JDK 17+; we build and run on JDK 25.
