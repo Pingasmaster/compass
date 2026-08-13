@@ -1,3 +1,5 @@
+import org.gradle.api.GradleException
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -14,8 +16,8 @@ android {
 
     // Shared by defaultConfig + future flavor offset. build.sh bumps this
     // via sed; future re-reads it on the next Gradle configure.
-    val baseVersionCode = 42
-    val baseVersionName = "1.0.41"
+    val baseVersionCode = 43
+    val baseVersionName = "1.0.42"
 
     defaultConfig {
         applicationId = "com.compass.app"
@@ -43,7 +45,80 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            val keystoreFile = file("../release-keystore.jks")
+            val passwordFile = rootProject.file(".password-signing-keys")
+            val requireReleaseSigning = providers
+                .gradleProperty("compass.requireReleaseSigning")
+                .map { it.equals("true", ignoreCase = true) }
+                .orElse(false)
+                .get()
+
+            if (keystoreFile.exists() && passwordFile.exists()) {
+                storeFile = keystoreFile
+                storePassword = passwordFile.readText().trim()
+                keyAlias = "compass"
+                keyPassword = storePassword
+            } else if (requireReleaseSigning) {
+                throw GradleException(
+                    "release-keystore.jks or .password-signing-keys missing, but " +
+                        "compass.requireReleaseSigning=true (set by ./build.sh " +
+                        "release path). Refusing to sign release artifacts with " +
+                        "the debug key. Place both files at the repo root, or use " +
+                        "./build.sh --debug for a local unsigned-of-production build.",
+                )
+            } else {
+                val fallbackMessage = "release-keystore.jks or .password-signing-keys missing - " +
+                    "falling back to AGP debug signing for the release variant " +
+                    "(ok for --debug / local; production builds must set " +
+                    "compass.requireReleaseSigning=true)."
+                rootProject.logger.warn(fallbackMessage)
+                val debug = signingConfigs.getByName("debug")
+                val debugStoreFile = debug.storeFile
+                if (debugStoreFile != null && !debugStoreFile.exists()) {
+                    debugStoreFile.parentFile.mkdirs()
+                    val process = ProcessBuilder(
+                        System.getProperty("java.home") + "/bin/keytool",
+                        "-genkey", "-noprompt",
+                        "-keystore", debugStoreFile.absolutePath,
+                        "-alias",
+                        requireNotNull(debug.keyAlias) {
+                            "debug signingConfig.keyAlias is null"
+                        },
+                        "-keyalg", "RSA", "-keysize", "2048",
+                        "-validity", "10000",
+                        "-dname", "CN=Android Debug,O=Android,C=US",
+                        "-storepass",
+                        requireNotNull(debug.storePassword) {
+                            "debug signingConfig.storePassword is null"
+                        },
+                        "-keypass",
+                        requireNotNull(debug.keyPassword) {
+                            "debug signingConfig.keyPassword is null"
+                        },
+                    ).redirectErrorStream(true).start()
+                    val output = process.inputStream.bufferedReader().readText()
+                    val exitCode = process.waitFor()
+                    if (exitCode != 0) {
+                        throw GradleException(
+                            "Failed to materialize debug keystore at " +
+                                "${debugStoreFile.absolutePath}: keytool exited $exitCode\n$output",
+                        )
+                    }
+                }
+                storeFile = debug.storeFile
+                storePassword = debug.storePassword
+                keyAlias = debug.keyAlias
+                keyPassword = debug.keyPassword
+            }
+        }
+    }
+
     buildTypes {
+        debug {
+            // AGP default debug signing. Never assign the release keystore.
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -51,10 +126,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            // WARNING: release APK is signed with the debug keystore for local
-            // iteration convenience. Wire a real signingConfig before Play
-            // distribution (env-var-backed keystore, or Play App Signing).
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 

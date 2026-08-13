@@ -12,6 +12,7 @@
 #   ./build.sh --format           # ktlintFormat + exit (no build)
 #   ./build.sh --build-health     # full build + dependency-analysis buildHealth report
 #   ./build.sh --smoke            # GMD Pixel 7a API 37 @SmokeTest (future)
+#   ./build.sh --e2e              # GMD hermetic androidTest (no LiveNetwork filter)
 #   ./build.sh --smoke-shipped    # :shippedsmoke release lane (future)
 #   ./build.sh --macrobenchmark   # advisory emulator macrobenchmarks (future)
 #   ./build.sh --publish          # serve existing root APKs over NetBird HTTP + exit
@@ -27,10 +28,9 @@
 # all valid "latest" targets. Pass --block-on-outdated to keep the old
 # refuse-to-build behavior instead of rewriting the catalog.
 #
-# After a successful full build, scripts/apk_http_serve.sh publishes both
-# http://<netbird-fqdn>:8765/app-release.apk (compat, Android 8+) and
-# http://<netbird-fqdn>:8765/app-release-future.apk (future, Android 17) until
-# both are downloaded once, 10 minutes, or the next ./build.sh invocation.
+# After a successful full build, scripts/apk_http_serve.sh publishes all four
+# root APKs (compat/future x release/debug) until they are downloaded once,
+# 10 minutes, or the next ./build.sh invocation.
 #
 # User-facing speed: default builds ALWAYS regenerate baseline-prof.txt +
 # startup-prof.txt (needs KVM) so release APKs ship fresh AOT hints. R8
@@ -40,9 +40,9 @@
 # IMPORTANT: Do NOT manually remove the global Android-apps build lock unless
 # you have user approval and have confirmed no process is using it (check with
 # `fuser ~/.cache/android-apps/build.lock` or `lsof` on that path). The lock is
-# shared across dustvalve_next, calc, compass, and STT_premium so only one of
-# those builds/cleans runs at a time. Deleting the file while a holder is
-# alive can break flock (new openers get a new inode).
+# shared across dustvalve_next, calc, compass, STT_premium, and Token Maxer
+# so only one of those builds/cleans runs at a time. Deleting the file while
+# a holder is alive can break flock (new openers get a new inode).
 #
 set -euo pipefail
 
@@ -73,6 +73,7 @@ DO_CLEAN_ONLY=0
 DO_FORMAT=0
 DO_BUILD_HEALTH=0
 DO_SMOKE=0
+DO_E2E=0
 DO_SMOKE_SHIPPED=0
 DO_MACROBENCHMARK=0
 DO_PUBLISH=0
@@ -103,6 +104,7 @@ for arg in "$@"; do
         --format)            DO_FORMAT=1 ;;
         --build-health)      DO_BUILD_HEALTH=1 ;;
         --smoke)             DO_SMOKE=1 ;;
+        --e2e)               DO_E2E=1 ;;
         --smoke-shipped)     DO_SMOKE_SHIPPED=1 ;;
         --macrobenchmark)    DO_MACROBENCHMARK=1 ;;
         --publish)           DO_PUBLISH=1 ;;
@@ -111,7 +113,7 @@ for arg in "$@"; do
         --block-on-outdated) BLOCK_ON_OUTDATED=1 ;;
         *)
             echo "Unknown arg: $arg (accepted: --clean, --format, --build-health," \
-                "--smoke, --smoke-shipped, --macrobenchmark," \
+                "--smoke, --e2e, --smoke-shipped, --macrobenchmark," \
                 "--publish, --publish-debug, --debug, --block-on-outdated)" >&2
             exit 2
             ;;
@@ -151,7 +153,7 @@ acquire_lock() {
     exec 9>"$LOCKFILE"
     if ! flock -n 9; then
         echo "Another Android app build/clean is already running" \
-            "(dustvalve_next/calc/compass/STT_premium share $LOCKFILE). Exiting."
+            "(dustvalve_next/calc/compass/STT_premium/Token Maxer share $LOCKFILE). Exiting."
         exit 1
     fi
 }
@@ -159,16 +161,51 @@ acquire_lock() {
 GMD_GPU=(-Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect)
 SMOKE_ANNOTATION="com.compass.app.testing.SmokeTest"
 
+# Production release path requires the real keystore. --debug omits this so
+# local assemble without release-keystore.jks / .password-signing-keys still
+# works (AGP debug signing fallback in app/build.gradle.kts). Standalone
+# --smoke / --e2e use debug androidTest APKs and also omit it. --smoke-shipped
+# omits it so a missing keystore can still drive a debug-signed release
+# variant (same as STT); default ./build.sh still fails assembleRelease.
+REQUIRE_RELEASE_SIGNING_ARGS=()
+if [[ "$DO_DEBUG" -eq 0 && "$DO_SMOKE" -eq 0 && "$DO_E2E" -eq 0 && "$DO_SMOKE_SHIPPED" -eq 0 ]]; then
+    REQUIRE_RELEASE_SIGNING_ARGS=(-Pcompass.requireReleaseSigning=true)
+fi
+
 regenerate_baseline_profiles() {
     if [[ ! -e /dev/kvm ]]; then
         echo "ERROR: /dev/kvm missing; GMD baseline generation needs KVM." >&2
         echo "Use ./build.sh --debug to skip baselines for a non-release build." >&2
         exit 1
     fi
-    ./gradlew :baselineprofile:pixel7aApi37Setup "${GMD_GPU[@]}"
-    ./gradlew :baselineprofile:pixel7aApi37FutureReleaseAndroidTest "${GMD_GPU[@]}" \
-        -Pandroid.testInstrumentationRunnerArguments.androidx.benchmark.enabledRules=baselineprofile
-    ./scripts/assert_tests_ran.sh 1 baselineprofile
+    # Retry: GMD LMK can kill the app mid-flush ("never flushed profiles").
+    local attempt=1
+    local max_attempts=3
+    ./gradlew "${REQUIRE_RELEASE_SIGNING_ARGS[@]}" \
+        :baselineprofile:pixel7aApi37Setup "${GMD_GPU[@]}"
+    while true; do
+        local attempt_log
+        attempt_log="$(mktemp)"
+        if ./gradlew "${REQUIRE_RELEASE_SIGNING_ARGS[@]}" \
+            :baselineprofile:pixel7aApi37FutureReleaseAndroidTest "${GMD_GPU[@]}" \
+            -Pandroid.testInstrumentationRunnerArguments.androidx.benchmark.enabledRules=baselineprofile \
+            >"$attempt_log" 2>&1 \
+            && ./scripts/assert_tests_ran.sh 1 baselineprofile; then
+            cat "$attempt_log"
+            rm -f "$attempt_log"
+            break
+        fi
+        if [[ "$attempt" -ge "$max_attempts" ]]; then
+            cat "$attempt_log" >&2 || true
+            rm -f "$attempt_log"
+            echo "ERROR: baseline profile generation failed after ${max_attempts} attempts." >&2
+            return 1
+        fi
+        rm -f "$attempt_log"
+        echo "Baseline profile attempt ${attempt}/${max_attempts} failed; retrying..." >&2
+        attempt=$((attempt + 1))
+        sleep 5
+    done
     chmod +x ./scripts/install_baseline_profiles.sh
     ./scripts/install_baseline_profiles.sh
 }
@@ -223,6 +260,15 @@ if [[ "$DO_SMOKE" -eq 1 ]]; then
     exit 0
 fi
 
+if [[ "$DO_E2E" -eq 1 ]]; then
+    acquire_lock
+    ./gradlew :app:pixel7aApi37Setup "${GMD_GPU[@]}"
+    ./gradlew :app:pixel7aApi37FutureDebugAndroidTest "${GMD_GPU[@]}"
+    ./scripts/assert_tests_ran.sh 1 app
+    echo "E2E hermetic complete."
+    exit 0
+fi
+
 if [[ "$DO_SMOKE_SHIPPED" -eq 1 ]]; then
     acquire_lock
     ./gradlew :shippedsmoke:pixel7aApi37Setup "${GMD_GPU[@]}"
@@ -245,6 +291,9 @@ fi
 acquire_lock
 
 ./scripts/check_ascii.sh
+chmod +x ./scripts/check_release_signing_gate.sh
+./scripts/check_release_signing_gate.sh
+chmod +x ./scripts/check_elf_16k_alignment.sh
 
 GRADLE_APK_COMPAT="app/build/outputs/apk/compat/release/app-compat-release.apk"
 GRADLE_MAPPING_COMPAT="app/build/outputs/mapping/compatRelease/mapping.txt"
@@ -295,7 +344,6 @@ else
 fi
 
 GRADLE_TASKS=(
-    clean
     ktlintCheck
     detekt
     lintCompatRelease
@@ -311,7 +359,21 @@ GRADLE_TASKS=(
     assembleFutureRelease
 )
 
-if ! ./gradlew "${GRADLE_TASKS[@]}"; then
+# Run clean in its own Gradle invocation. Leaving it in GRADLE_TASKS lets
+# org.gradle.parallel schedule :ktlintCheck / :*:detekt alongside :*:clean,
+# and ktlint's file walk then races with directories being deleted (NoSuchFileException
+# on intermediates under app/build/).
+if ! ./gradlew clean; then
+    revert_version_bump
+    exit 1
+fi
+
+if ! ./gradlew "${REQUIRE_RELEASE_SIGNING_ARGS[@]}" "${GRADLE_TASKS[@]}"; then
+    revert_version_bump
+    exit 1
+fi
+
+if ! ./scripts/check_elf_16k_alignment.sh "$GRADLE_APK_COMPAT" "$GRADLE_APK_FUTURE"; then
     revert_version_bump
     exit 1
 fi
@@ -361,6 +423,7 @@ if [[ "$DO_DEBUG" -eq 1 ]]; then
 fi
 
 rm -f "$ROOT_APK" "$ROOT_MAPPING" "$ROOT_APK_FUTURE" "$ROOT_MAPPING_FUTURE"
+rm -f "$ROOT_APK_DEBUG_COMPAT" "$ROOT_APK_DEBUG_FUTURE"
 cp "$GRADLE_APK_COMPAT" "$ROOT_APK"
 echo "Copied compat release APK to $ROOT_APK"
 if [[ -f "$GRADLE_MAPPING_COMPAT" ]]; then
@@ -373,17 +436,12 @@ if [[ -f "$GRADLE_MAPPING_FUTURE" ]]; then
     cp "$GRADLE_MAPPING_FUTURE" "$ROOT_MAPPING_FUTURE"
     echo "Copied future release mapping to $ROOT_MAPPING_FUTURE"
 fi
+cp "$DEBUG_APK_COMPAT" "$ROOT_APK_DEBUG_COMPAT"
+echo "Copied compat debug APK to $ROOT_APK_DEBUG_COMPAT"
+cp "$DEBUG_APK_FUTURE" "$ROOT_APK_DEBUG_FUTURE"
+echo "Copied future debug APK to $ROOT_APK_DEBUG_FUTURE"
 
-echo "" >&2
-echo "##################################################################" >&2
-echo "# WARNING: these release APKs are signed with the DEBUG keystore #" >&2
-echo "# (~/.android/debug.keystore, well-known password). Anyone with  #" >&2
-echo "# that key can push valid updates to every device that installed #" >&2
-echo "# from this pipeline, and a regenerated keystore strands them.   #" >&2
-echo "# Wire a real release signingConfig before wider distribution    #" >&2
-echo "# (see app/build.gradle.kts, buildTypes.release).                #" >&2
-echo "##################################################################" >&2
-echo "" >&2
-
-# Serve both flavor APKs (compat + future).
-./scripts/apk_http_serve.sh start "$ROOT_APK" "$ROOT_APK_FUTURE"
+# Serve release + debug for both flavors (compat + future).
+./scripts/apk_http_serve.sh start \
+    "$ROOT_APK" "$ROOT_APK_FUTURE" \
+    "$ROOT_APK_DEBUG_COMPAT" "$ROOT_APK_DEBUG_FUTURE"
