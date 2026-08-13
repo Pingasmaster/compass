@@ -17,13 +17,14 @@ No GitHub Actions workflows - all gates run locally via `./build.sh`.
 ## Local pipeline
 
 - Default: `./build.sh` (ASCII, ktlint, detekt, lintCompatRelease + lintFutureRelease,
-  unit tests for both api flavors, assemble compat/future debug+release, dual APKs +
-  mappings, NetBird serve of compat `app-release.apk`)
+  unit tests for both api flavors, assemble compat/future debug+release, GMD
+  shippedsmoke + smoke + e2e on future API 37, dual APKs + mappings, NetBird serve
+  of compat `app-release.apk`)
 - Product flavors: `compat` (minSdk 26, `app-release.apk`) and `future` (minSdk 37,
   `app-release-future.apk`)
-- `./build.sh --smoke` / `--smoke-shipped` / `--macrobenchmark`
-  (GMD tasks use Future variant names; baselines regenerate on every
-  default `./build.sh`, skipped by `--debug`)
+- `./build.sh --smoke` / `--e2e` / `--smoke-shipped` / `--macrobenchmark`
+  (standalone GMD; default `./build.sh` already runs smoke + e2e + shippedsmoke.
+  Baselines regenerate on every default `./build.sh`, skipped by `--debug`)
 - Shared flock: `~/.cache/android-apps/build.lock` (do not delete while held)
 - Version bump runs on `baseVersionCode` / `baseVersionName` before the Gradle build;
   a failed build reverts the bump.

@@ -4,10 +4,11 @@
 #   ./build.sh                    # RELEASE path: regen baseline+startup profiles (GMD),
 #                                 # bump version, clean + ASCII + ktlint + detekt + lint
 #                                 # + tests + assemble harnesses + assemble APKs,
-#                                 # then one-shot NetBird APK HTTP serve for both APKs
+#                                 # then GMD shippedsmoke + smoke + e2e (future API 37),
+#                                 # then one-shot NetBird APK HTTP serve. Requires /dev/kvm.
 #   ./build.sh --debug            # DEV path: same gates/assemble, but skip release-only
-#                                 # steps (baseline regen + version bump), then copy the
-#                                 # debug APKs to the repo root and serve those
+#                                 # steps (baseline regen + version bump + GMD device
+#                                 # gates), then copy the debug APKs to the repo root
 #   ./build.sh --clean            # gradle clean + remove APKs + exit
 #   ./build.sh --format           # ktlintFormat + exit (no build)
 #   ./build.sh --build-health     # full build + dependency-analysis buildHealth report
@@ -34,8 +35,10 @@
 #
 # User-facing speed: default builds ALWAYS regenerate baseline-prof.txt +
 # startup-prof.txt (needs KVM) so release APKs ship fresh AOT hints. R8
-# minify + resource shrink already run on assemble*Release. Macrobenchmark
-# only measures - it does not speed up users, so it stays opt-in.
+# minify + resource shrink already run on assemble*Release. Default ./build.sh
+# always runs shippedsmoke + smoke + e2e on GMD (needs KVM). --debug skips
+# those device gates. Macrobenchmark only measures - it does not speed up
+# users, so it stays opt-in.
 #
 # IMPORTANT: Do NOT manually remove the global Android-apps build lock unless
 # you have user approval and have confirmed no process is using it (check with
@@ -165,6 +168,69 @@ acquire_lock() {
 GMD_GPU=(-Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect)
 SMOKE_ANNOTATION="com.compass.app.testing.SmokeTest"
 
+require_kvm() {
+    if [[ ! -e /dev/kvm ]]; then
+        echo "ERROR: /dev/kvm missing; GMD instrumented tests need KVM." >&2
+        echo "Use ./build.sh --debug to skip GMD for a non-release build." >&2
+        return 1
+    fi
+}
+
+# Device lanes used by the default release path and by the standalone --smoke /
+# --e2e / --smoke-shipped modes. Kept as functions so release and opt-in share
+# one assertion floor. Compass has no API 34 GMD; future Pixel 7a API 37 only.
+run_smoke_tests() {
+    require_kvm || return 1
+    ./gradlew :app:pixel7aApi37Setup "${GMD_GPU[@]}" || return 1
+    local app_timeout_sec="${APP_ANDROID_TEST_TIMEOUT_SEC:-600}"
+    local rc=0
+    timeout --foreground "${app_timeout_sec}s" \
+        ./gradlew :app:pixel7aApi37FutureDebugAndroidTest "${GMD_GPU[@]}" \
+            -Pandroid.testInstrumentationRunnerArguments.annotation="$SMOKE_ANNOTATION" \
+        || {
+            rc=$?
+            if [[ "$rc" -eq 124 ]]; then
+                echo "ERROR: :app smoke GMD androidTest exceeded ${app_timeout_sec}s" >&2
+            fi
+        }
+    [[ "$rc" -eq 0 ]] || return "$rc"
+    ./scripts/assert_tests_ran.sh 1 app || return 1
+}
+
+run_e2e_tests() {
+    require_kvm || return 1
+    ./gradlew :app:pixel7aApi37Setup "${GMD_GPU[@]}" || return 1
+    local app_timeout_sec="${APP_ANDROID_TEST_TIMEOUT_SEC:-900}"
+    local rc=0
+    timeout --foreground "${app_timeout_sec}s" \
+        ./gradlew :app:pixel7aApi37FutureDebugAndroidTest "${GMD_GPU[@]}" \
+        || {
+            rc=$?
+            if [[ "$rc" -eq 124 ]]; then
+                echo "ERROR: :app e2e GMD androidTest exceeded ${app_timeout_sec}s" >&2
+            fi
+        }
+    [[ "$rc" -eq 0 ]] || return "$rc"
+    # LaunchSmokeTest is the only :app androidTest; floor stays 1.
+    ./scripts/assert_tests_ran.sh 1 app || return 1
+}
+
+run_shipped_smoke_tests() {
+    require_kvm || return 1
+    ./gradlew :shippedsmoke:pixel7aApi37Setup "${GMD_GPU[@]}" || return 1
+    local smoke_timeout_sec="${SHIPPED_SMOKE_TIMEOUT_SEC:-600}"
+    timeout --foreground "${smoke_timeout_sec}s" \
+        ./gradlew :shippedsmoke:pixel7aApi37FutureReleaseAndroidTest "${GMD_GPU[@]}" \
+        || {
+            local rc=$?
+            if [[ "$rc" -eq 124 ]]; then
+                echo "ERROR: :shippedsmoke GMD androidTest exceeded ${smoke_timeout_sec}s" >&2
+            fi
+            return "$rc"
+        }
+    ./scripts/assert_tests_ran.sh 1 shippedsmoke || return 1
+}
+
 # Production release path requires the real keystore. --debug omits this so
 # local assemble without release-keystore.jks / .password-signing-keys still
 # works (AGP debug signing fallback in app/build.gradle.kts). Standalone
@@ -256,28 +322,21 @@ fi
 
 if [[ "$DO_SMOKE" -eq 1 ]]; then
     acquire_lock
-    ./gradlew :app:pixel7aApi37Setup "${GMD_GPU[@]}"
-    ./gradlew :app:pixel7aApi37FutureDebugAndroidTest "${GMD_GPU[@]}" \
-        -Pandroid.testInstrumentationRunnerArguments.annotation="$SMOKE_ANNOTATION"
-    ./scripts/assert_tests_ran.sh 1 app
+    run_smoke_tests || exit $?
     echo "Smoke complete."
     exit 0
 fi
 
 if [[ "$DO_E2E" -eq 1 ]]; then
     acquire_lock
-    ./gradlew :app:pixel7aApi37Setup "${GMD_GPU[@]}"
-    ./gradlew :app:pixel7aApi37FutureDebugAndroidTest "${GMD_GPU[@]}"
-    ./scripts/assert_tests_ran.sh 1 app
+    run_e2e_tests || exit $?
     echo "E2E hermetic complete."
     exit 0
 fi
 
 if [[ "$DO_SMOKE_SHIPPED" -eq 1 ]]; then
     acquire_lock
-    ./gradlew :shippedsmoke:pixel7aApi37Setup "${GMD_GPU[@]}"
-    ./gradlew :shippedsmoke:pixel7aApi37FutureReleaseAndroidTest "${GMD_GPU[@]}"
-    ./scripts/assert_tests_ran.sh 1 shippedsmoke
+    run_shipped_smoke_tests || exit $?
     echo "Shipped smoke complete."
     exit 0
 fi
@@ -380,6 +439,27 @@ fi
 if ! ./scripts/check_elf_16k_alignment.sh "$GRADLE_APK_COMPAT" "$GRADLE_APK_FUTURE"; then
     revert_version_bump
     exit 1
+fi
+
+# Release path always runs the GMD device lanes. --debug skips them so a
+# compile/unit-test loop stays fast and KVM-free after assemble.
+# Shippedsmoke first: release APK on a clean GMD before debug androidTests
+# replace the install.
+if [[ "$DO_DEBUG" -eq 0 ]]; then
+    echo "Release build: running shippedsmoke + smoke + e2e on GMD..."
+    if ! run_shipped_smoke_tests; then
+        revert_version_bump
+        exit 1
+    fi
+    if ! run_smoke_tests; then
+        revert_version_bump
+        exit 1
+    fi
+    if ! run_e2e_tests; then
+        revert_version_bump
+        exit 1
+    fi
+    echo "Device gates complete."
 fi
 
 if [[ "$DO_BUILD_HEALTH" -eq 1 ]]; then

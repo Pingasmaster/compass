@@ -6,7 +6,6 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -26,11 +25,25 @@ class ShippedReleaseSmokeTest {
 
     private fun launchApp() {
         device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+        device.executeShellCommand(
+            "pm grant $PACKAGE android.permission.ACCESS_COARSE_LOCATION",
+        )
         device.pressHome()
+        device.waitForIdle()
+        val packages = device.executeShellCommand("pm path $PACKAGE").trim()
+        assertTrue(
+            "release APK not installed for $PACKAGE (pm path empty).",
+            packages.contains(PACKAGE) || packages.contains("package:"),
+        )
+
         val context = InstrumentationRegistry.getInstrumentation().context
-        val intent = context.packageManager.getLaunchIntentForPackage(PACKAGE)
-        assertNotNull("no launch intent for $PACKAGE - is the release APK installed?", intent)
-        context.startActivity(intent!!.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK))
+        val intent = requireNotNull(
+            context.packageManager.getLaunchIntentForPackage(PACKAGE),
+        ) {
+            "no launch intent for $PACKAGE - is the release APK installed " +
+                "and is <queries> declared in the shippedsmoke manifest?"
+        }
+        context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK))
 
         assertTrue(
             "$PACKAGE never reached the foreground - the shipped APK most likely crashed on launch",

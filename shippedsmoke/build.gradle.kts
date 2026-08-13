@@ -45,13 +45,16 @@ android {
         }
     }
 
-    testOptions.managedDevices.localDevices {
-        register("pixel7aApi37") {
-            device = "Pixel 7a"
-            apiLevel = 37
-            systemImageSource = "google"
-            pageAlignment = com.android.build.api.dsl.ManagedVirtualDevice.PageAlignment.FORCE_16KB_PAGES
-            testedAbi = "arm64-v8a"
+    testOptions {
+        animationsDisabled = true
+        managedDevices.localDevices {
+            register("pixel7aApi37") {
+                device = "Pixel 7a"
+                apiLevel = 37
+                systemImageSource = "google"
+                pageAlignment = com.android.build.api.dsl.ManagedVirtualDevice.PageAlignment.FORCE_16KB_PAGES
+                testedAbi = "arm64-v8a"
+            }
         }
     }
 }

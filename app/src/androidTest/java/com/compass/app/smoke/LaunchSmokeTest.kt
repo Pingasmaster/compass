@@ -7,7 +7,6 @@ import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 import com.compass.app.testing.SmokeTest
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -17,6 +16,10 @@ private const val LAUNCH_TIMEOUT_MS = 60_000L
 
 /**
  * Tier 2 on-device smoke: cold-start keeps [PACKAGE] in the foreground.
+ *
+ * Grant ACCESS_COARSE_LOCATION before launch: first-run True North prompting
+ * otherwise opens the system permission dialog (a different package) and
+ * [By.pkg] never sees the compass window.
  */
 @SmokeTest
 @RunWith(AndroidJUnit4::class)
@@ -25,13 +28,20 @@ class LaunchSmokeTest {
     @Test
     fun app_launches_and_staysInForeground() {
         val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+        device.executeShellCommand(
+            "pm grant $PACKAGE android.permission.ACCESS_COARSE_LOCATION",
+        )
         device.pressHome()
+        device.waitForIdle()
 
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        val intent = context.packageManager.getLaunchIntentForPackage(PACKAGE)
-        assertNotNull("no launch intent for $PACKAGE", intent)
+        val intent = requireNotNull(
+            context.packageManager.getLaunchIntentForPackage(PACKAGE),
+        ) {
+            "no launch intent for $PACKAGE"
+        }
         context.startActivity(
-            intent!!.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK),
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK),
         )
 
         assertTrue(
