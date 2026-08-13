@@ -51,21 +51,25 @@ cd "$SCRIPT_DIR"
 
 ./scripts/apk_http_serve.sh stop || true
 
-if [[ -z "${JAVA_HOME:-}" || "${JAVA_HOME}" == "${SCRIPT_DIR}/.jdk25-home" ]]; then
+if [[ -z "${JAVA_HOME:-}" || "${JAVA_HOME}" == "${SCRIPT_DIR}/.jdk26-home" ]]; then
     unset JAVA_HOME
     for candidate in \
-        "${HOME}/.jdks/jdk-25" \
-        /usr/lib/jvm/java-25-openjdk-amd64 \
-        /usr/lib/jvm/java-25-openjdk \
-        /usr/lib/jvm/temurin-25-jdk-amd64; do
+        /usr/lib/jvm/java-26-openjdk \
+        /usr/lib/jvm/default \
+        /usr/lib/jvm/java-26-openjdk-amd64 \
+        /usr/lib/jvm/temurin-26-jdk-amd64 \
+        "${HOME}/.jdks/jdk-26"; do
         if [[ -x "${candidate}/bin/java" ]]; then
-            export JAVA_HOME="$candidate"
-            break
+            ver="$("${candidate}/bin/java" -version 2>&1 | head -1 || true)"
+            if [[ "$ver" == *'"26'* || "$ver" == *' 26.'* ]]; then
+                export JAVA_HOME="$candidate"
+                break
+            fi
         fi
     done
 fi
-# shellcheck source=scripts/ensure-jdk25-home.sh
-source "$SCRIPT_DIR/scripts/ensure-jdk25-home.sh"
+# shellcheck source=scripts/ensure-jdk26-home.sh
+source "$SCRIPT_DIR/scripts/ensure-jdk26-home.sh"
 
 export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:+$JAVA_TOOL_OPTIONS }--sun-misc-unsafe-memory-access=allow --enable-native-access=ALL-UNNAMED"
 

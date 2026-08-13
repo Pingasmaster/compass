@@ -58,9 +58,9 @@ release-keystore.jks
 # JVM / debugging
 hs_err_pid*.log
 *.hprof
-# Project-local JDK 25 home with a bin/java wrapper that injects
+# Project-local JDK 26 home with a bin/java wrapper that injects
 # --sun-misc-unsafe-memory-access=allow for Gradle Worker Daemons.
-.jdk25-home/
+.jdk26-home/
 
 # Generated icon/script temp files
 /scripts/*.tmp

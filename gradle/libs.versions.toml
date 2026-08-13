@@ -33,9 +33,9 @@ androidx-test-uiautomator = "2.4.0"
 errorprone-annotations = "2.50.0"
 
 # Static analysis toolchain.
-# ktlint-engine pins the CLI used by the JDK 25 JavaExec tasks in the root
+# ktlint-engine pins the CLI used by the JDK 26 JavaExec tasks in the root
 # build.gradle.kts. ktlint-gradle was removed: its process workers load
-# kotlin-compiler-embeddable into the JDK 25 daemon and emit JEP 498 WARNINGs.
+# kotlin-compiler-embeddable into the JDK 26 daemon and emit JEP 498 WARNINGs.
 ktlint-engine = "1.8.0"
 detekt = "2.0.0-alpha.6"
 compose-rules = "0.6.4"
@@ -43,11 +43,11 @@ slack-lint-checks = "0.11.1"
 slack-compose-lints = "1.5.4"
 dependency-analysis = "3.18.0"
 
-# JDK toolchain target. AGP 9.x requires JDK 17+; we build and run on JDK 25.
-jvmTarget = "25"
+# JDK toolchain target. AGP 9.x requires JDK 17+; we build and run on JDK 26.
+jvmTarget = "26"
 
 [libraries]
-# Core library desugaring (compat flavor: minSdk 26 + JVM 25 bytecode)
+# Core library desugaring (compat flavor: minSdk 26 + JVM 26 bytecode)
 desugar-jdk-libs = { group = "com.android.tools", name = "desugar_jdk_libs", version.ref = "desugar-jdk-libs" }
 
 compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "compose-bom" }
@@ -73,9 +73,9 @@ coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutin
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
 
-# ktlint CLI runs on a JDK 25 toolchain (see root build.gradle.kts). The
+# ktlint CLI runs on a JDK 26 toolchain (see root build.gradle.kts). The
 # jlleitschuh gradle plugin is intentionally unused: its workers load
-# kotlin-compiler-embeddable into the JDK 25 daemon and trip JEP 498 Unsafe
+# kotlin-compiler-embeddable into the JDK 26 daemon and trip JEP 498 Unsafe
 # terminal-deprecation WARNINGs. The JavaExec tasks set the JEP 498 opt-in
 # as jvmArgs, so the CLI itself stays quiet.
 ktlint-cli = { group = "com.pinterest.ktlint", name = "ktlint-cli", version.ref = "ktlint-engine" }

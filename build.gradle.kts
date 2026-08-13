@@ -8,12 +8,12 @@ plugins {
     alias(libs.plugins.detekt) apply false
     alias(libs.plugins.dependency.analysis)
     alias(libs.plugins.androidx.baselineprofile) apply false
-    // Provides JavaToolchainService for the JDK 25 ktlint JavaExec tasks below.
+    // Provides JavaToolchainService for the JDK 26 ktlint JavaExec tasks below.
     id("jvm-toolchains")
 }
 
-// ktlint CLI via JavaExec on JDK 25. The ktlint-gradle plugin was removed:
-// its worker processes load kotlin-compiler-embeddable into the JDK 25 daemon
+// ktlint CLI via JavaExec on JDK 26. The ktlint-gradle plugin was removed:
+// its worker processes load kotlin-compiler-embeddable into the JDK 26 daemon
 // and emit terminally-deprecated sun.misc.Unsafe::objectFieldOffset WARNINGs
 // (JEP 498) that the daemon's own opt-in flags never reach. Running the CLI in
 // a plain JavaExec keeps that compiler out of the build entirely.
@@ -47,7 +47,7 @@ val ktlintInputPatterns = listOf(
 fun JavaExec.configureKtlint(extraArgs: List<String>) {
     javaLauncher.set(
         javaToolchains.launcherFor {
-            languageVersion.set(JavaLanguageVersion.of(25))
+            languageVersion.set(JavaLanguageVersion.of(26))
         },
     )
     classpath = ktlintCli
@@ -63,12 +63,12 @@ fun JavaExec.configureKtlint(extraArgs: List<String>) {
 
 tasks.register<JavaExec>("ktlintCheck") {
     group = "verification"
-    description = "Check Kotlin sources with ktlint on JDK 25"
+    description = "Check Kotlin sources with ktlint on JDK 26"
     configureKtlint(emptyList())
 }
 
 tasks.register<JavaExec>("ktlintFormat") {
     group = "formatting"
-    description = "Format Kotlin sources with ktlint on JDK 25"
+    description = "Format Kotlin sources with ktlint on JDK 26"
     configureKtlint(listOf("-F"))
 }

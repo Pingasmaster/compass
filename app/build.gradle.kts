@@ -16,8 +16,8 @@ android {
 
     // Shared by defaultConfig + future flavor offset. build.sh bumps this
     // via sed; future re-reads it on the next Gradle configure.
-    val baseVersionCode = 43
-    val baseVersionName = "1.0.42"
+    val baseVersionCode = 44
+    val baseVersionName = "1.0.43"
 
     defaultConfig {
         applicationId = "com.compass.app"
@@ -131,16 +131,16 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_25
-        targetCompatibility = JavaVersion.VERSION_25
-        // Required for compat (minSdk 26 + JVM 25). Harmless no-op on future
+        sourceCompatibility = JavaVersion.VERSION_26
+        targetCompatibility = JavaVersion.VERSION_26
+        // Required for compat (minSdk 26 + JVM 26). Harmless no-op on future
         // for APIs already present on Android 17; R8 strips unused bits.
         isCoreLibraryDesugaringEnabled = true
     }
 
     kotlin {
         compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_25)
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_26)
         }
     }
 
@@ -175,6 +175,21 @@ android {
                     testedAbi = "arm64-v8a"
                 }
             }
+        }
+        unitTests.all { test ->
+            test.jvmArgs(
+                "--add-opens=java.base/java.lang=ALL-UNNAMED",
+                "--add-opens=java.base/java.util=ALL-UNNAMED",
+                "--add-opens=java.base/java.io=ALL-UNNAMED",
+                "--add-opens=java.base/java.nio=ALL-UNNAMED",
+                "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED",
+                "--add-opens=java.base/jdk.internal.access=ALL-UNNAMED",
+                "--add-exports=java.base/jdk.internal.access=ALL-UNNAMED",
+                "--enable-native-access=ALL-UNNAMED",
+                "--enable-final-field-mutation=ALL-UNNAMED",
+                "--sun-misc-unsafe-memory-access=allow",
+                "-Xshare:off",
+            )
         }
     }
 }
