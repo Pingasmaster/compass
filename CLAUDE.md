@@ -33,7 +33,7 @@ No GitHub Actions workflows - all gates run locally via `./build.sh`.
 ## Shared build.sh
 
 `build.sh` is the same script across dustvalve_next, calc, compass,
-STT_premium, and Token Maxer except the PROJECT CONFIG block (signing
+and core except the PROJECT CONFIG block (signing
 property, GMD annotations, Gradle tasks, extra flags). When you change
 shared behavior (publish, lock, JDK, version bump, serve helper), port it
 to the other four the same day.
