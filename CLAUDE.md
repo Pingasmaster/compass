@@ -25,7 +25,7 @@ No GitHub Actions workflows - all gates run locally via `./build.sh`.
   `./build.sh --publish` re-serves that same four-file set.
 - `./build.sh --smoke` / `--e2e` / `--smoke-shipped` / `--macrobenchmark`
   (standalone GMD; default `./build.sh` already runs smoke + e2e + shippedsmoke.
-  Baselines regenerate on every default `./build.sh`, skipped by `--debug`)
+  Baselines regenerate when UI/startup sources change, or with `--force-baseline`; skipped by `--debug`)
 - Shared flock: `~/.cache/android-apps/build.lock` (do not delete while held)
 - Version bump runs on `baseVersionCode` / `baseVersionName` before the Gradle build;
   a failed build reverts the bump.
