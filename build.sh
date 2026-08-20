@@ -69,40 +69,44 @@
 # until the holder finishes. Deleting the file while a
 # holder is alive can break flock (new openers get a new inode).
 #
-# Builds other than --publish re-exec inside a shared KVM guest (12 GiB RAM,
-# 16 vCPUs, virtio-blk/net/rng/fs, nested KVM for GMD) so Gradle leaks are
-# freed when QEMU exits. The host wrapper holds the same flock for the VM
-# lifetime. ANDROID_BUILD_ON_HOST=1 skips the VM.
+# Builds other than --publish re-exec into the shared glibc distrobox
+# (Debian: JDK 26, Android SDK, rustup nightly). Do not install those on
+# the Alpine musl host. ANDROID_BUILD_ON_HOST=1 skips the box.
 #
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Gradle/GMD leak host RAM into swap. Re-exec inside the shared KVM build
-# VM unless we are already the guest, the caller opted out, or this is a
-# serve-only --publish (no Gradle). The host wrapper holds the shared
-# ~/.cache/android-apps/build.lock so only one VM runs at a time.
-if [[ "${ANDROID_BUILD_IN_VM:-}" != "1" && "${ANDROID_BUILD_ON_HOST:-}" != "1" ]]; then
-    _want_vm=1
+# Re-exec into distrobox "glibc" unless we are already inside it, the caller
+# opted out, or this is serve-only --publish (no Gradle).
+if [[ ! -f /run/.containerenv && -z "${DISTROBOX_ENTER_PATH:-}" && "${ANDROID_BUILD_ON_HOST:-}" != "1" ]]; then
+    _want_box=1
     for _arg in "$@"; do
         if [[ "$_arg" == "--publish" ]]; then
-            _want_vm=0
+            _want_box=0
             break
         fi
     done
-    if [[ "$_want_vm" -eq 1 ]]; then
-        unset _want_vm _arg
-        exec "$SCRIPT_DIR/scripts/run_in_build_vm.sh" "$@"
+    if [[ "$_want_box" -eq 1 ]]; then
+        unset _want_box _arg
+        if command -v glibc-enter >/dev/null 2>&1; then
+            exec glibc-enter "$SCRIPT_DIR/build.sh" "$@"
+        fi
+        if [[ -x /usr/local/bin/glibc-enter ]]; then
+            exec /usr/local/bin/glibc-enter "$SCRIPT_DIR/build.sh" "$@"
+        fi
+        echo "ERROR: glibc-enter not found; Android builds run in the glibc distrobox." >&2
+        exit 1
     fi
-    unset _want_vm _arg
+    unset _want_box _arg
 fi
 
 ./scripts/apk_http_serve.sh stop || true
 
 # Prefer a real JDK 26, then wrap it so Gradle Worker Daemons (ktlint) also
-# get the JEP 498 / JEP 472 opt-in flags. Arch ships JDK 26 as
-# extra/jdk-openjdk -> /usr/lib/jvm/java-26-openjdk (also via default).
+# get the JEP 498 / JEP 472 opt-in flags. Distrobox Debian ships Temurin 26
+# at /usr/lib/jvm/temurin-26-jdk-amd64. Arch extra/jdk-openjdk is java-26-openjdk.
 if [[ -z "${JAVA_HOME:-}" || "${JAVA_HOME}" == "${SCRIPT_DIR}/.jdk26-home" ]]; then
     unset JAVA_HOME
     for candidate in \

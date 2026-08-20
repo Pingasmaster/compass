@@ -45,6 +45,15 @@ serve helper), port it to the other three the same day.
 - Shared flock: `~/.cache/android-apps/build.lock` (do not delete while held).
   A second `./build.sh` waits.
 
+## Alpine host / glibc distrobox
+
+`./build.sh` re-execs into the shared Debian distrobox named `glibc`
+(same box as Rust/cargo). Do not install JDK, Gradle, or the Android SDK
+on the Alpine musl host. The host needs podman, distrobox, and
+`/usr/local/bin/glibc-enter`. JDK 26 (Temurin) and the SDK live inside
+the box; `$HOME` (and the project directory) are bind-mounted at the
+same paths. GMD still needs `/dev/kvm` on the host.
+
 ## Gradle
 
 Compass already enables the build cache and configuration-cache
