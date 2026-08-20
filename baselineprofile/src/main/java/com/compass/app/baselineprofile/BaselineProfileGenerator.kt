@@ -17,8 +17,9 @@ private const val TARGET_PACKAGE = "com.compass.app"
  *  2. grant_location_permission (best-effort)
  *  3. open settings / toggle true north (best-effort)
  *
- * Kept short and sleep-light so the 2G GMD guest does not trip LMK during
- * google_apis cold boot + profile collection.
+ * Guest RAM/CPU is raised in scripts/gmd_ensure_avd.sh (4G / 6 cores).
+ * Leave the app in the foreground when collect returns: MacrobenchmarkScope
+ * sleeps 5s then SAVE_PROFILE, and ART requires a live process.
  */
 @RunWith(AndroidJUnit4::class)
 class BaselineProfileGenerator {

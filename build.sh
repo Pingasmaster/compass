@@ -278,6 +278,22 @@ gradle() {
     "${GRADLE_CMD[@]}" "$@"
 }
 
+# AGP Setup creates-and-starts the GMD in one task at the sdklib 2-3G / 2-core
+# cap. Patch existing AVDs first; if Setup just created a fresh cap-sized
+# guest, patch again and Setup once more so qemu cold-boots 4G / 6 cores.
+# Not a collector retry: the ART SAVE_PROFILE flush needs a live process.
+gmd_setup() {
+    ./scripts/gmd_ensure_avd.sh || return 1
+    gradle "$@" || return 1
+    ./scripts/gmd_ensure_avd.sh || return 1
+    local stamp="${XDG_CACHE_HOME:-$HOME/.cache}/android-apps/gmd-avd.changed"
+    if [[ -f "$stamp" && "$(cat "$stamp")" == "1" ]]; then
+        echo "GMD AVD RAM/CPU patched after first create; cold-booting patched guest."
+        gradle "$@" || return 1
+    fi
+}
+
+
 copy_debug_apks_to_root() {
     rm -f "$ROOT_APK_DEBUG_COMPAT" "$ROOT_APK_DEBUG_FUTURE"
     cp "$DEBUG_APK_COMPAT" "$ROOT_APK_DEBUG_COMPAT"
@@ -351,7 +367,7 @@ fi
 run_smoke_tests() {
     require_kvm || return 1
     if [[ "${GMD_SKIP_APP_API37_SETUP:-0}" -ne 1 ]]; then
-        gradle :app:pixel7aApi37Setup "${GMD_GPU[@]}" || return 1
+        gmd_setup :app:pixel7aApi37Setup "${GMD_GPU[@]}" || return 1
     fi
     gmd_pre_android_test
     local app_timeout_sec="${APP_ANDROID_TEST_TIMEOUT_SEC:-600}"
@@ -372,7 +388,7 @@ run_smoke_tests() {
 
 run_compat_smoke_tests() {
     require_kvm || return 1
-    gradle :app:pixel7aApi34Setup "${GMD_GPU[@]}" || return 1
+    gmd_setup :app:pixel7aApi34Setup "${GMD_GPU[@]}" || return 1
     gmd_pre_android_test
     local app_timeout_sec="${APP_ANDROID_TEST_TIMEOUT_SEC:-600}"
     local rc=0
@@ -393,7 +409,7 @@ run_compat_smoke_tests() {
 run_e2e_tests() {
     require_kvm || return 1
     if [[ "${GMD_SKIP_APP_API37_SETUP:-0}" -ne 1 ]]; then
-        gradle :app:pixel7aApi37Setup "${GMD_GPU[@]}" || return 1
+        gmd_setup :app:pixel7aApi37Setup "${GMD_GPU[@]}" || return 1
     fi
     gmd_pre_android_test
     local app_timeout_sec="${APP_ANDROID_TEST_TIMEOUT_SEC:-900}"
@@ -418,7 +434,7 @@ run_e2e_tests() {
 
 run_shipped_smoke_tests() {
     require_kvm || return 1
-    gradle :shippedsmoke:pixel7aApi37Setup "${GMD_GPU[@]}" || return 1
+    gmd_setup :shippedsmoke:pixel7aApi37Setup "${GMD_GPU[@]}" || return 1
     local smoke_timeout_sec="${SHIPPED_SMOKE_TIMEOUT_SEC:-600}"
     timeout --foreground "${smoke_timeout_sec}s" \
         "${GRADLE_CMD[@]}" :shippedsmoke:pixel7aApi37FutureReleaseAndroidTest "${GMD_GPU[@]}" \
@@ -438,7 +454,7 @@ regenerate_baseline_profiles() {
         echo "Use ./build.sh --debug to skip baselines for a non-release build." >&2
         exit 1
     fi
-    gradle "${REQUIRE_RELEASE_SIGNING_ARGS[@]}" \
+    gmd_setup "${REQUIRE_RELEASE_SIGNING_ARGS[@]}" \
         :baselineprofile:pixel7aApi37Setup "${GMD_GPU[@]}" \
         || return 1
     gradle "${REQUIRE_RELEASE_SIGNING_ARGS[@]}" \
@@ -509,7 +525,7 @@ fi
 
 if [[ "$DO_MACROBENCHMARK" -eq 1 ]]; then
     acquire_lock
-    gradle :macrobenchmark:pixel7aApi37Setup "${GMD_GPU[@]}"
+    gmd_setup :macrobenchmark:pixel7aApi37Setup "${GMD_GPU[@]}"
     gradle :macrobenchmark:pixel7aApi37FutureReleaseAndroidTest "${GMD_GPU[@]}" \
         -Pandroid.testInstrumentationRunnerArguments.androidx.benchmark.suppressErrors=EMULATOR
     ./scripts/assert_tests_ran.sh "$MACROBENCHMARK_ASSERT_COUNT" macrobenchmark
@@ -662,7 +678,7 @@ if ! run_shipped_smoke_tests; then
     revert_version_bump
     exit 1
 fi
-if ! gradle :app:pixel7aApi37Setup "${GMD_GPU[@]}"; then
+if ! gmd_setup :app:pixel7aApi37Setup "${GMD_GPU[@]}"; then
     revert_version_bump
     exit 1
 fi
