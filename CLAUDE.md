@@ -16,27 +16,40 @@ No GitHub Actions workflows - all gates run locally via `./build.sh`.
 
 ## Local pipeline
 
-- Default: `./build.sh` (ASCII, ktlint, detekt, lintCompatRelease + lintFutureRelease,
-  unit tests for both api flavors, assemble compat/future debug+release, GMD
-  shippedsmoke + smoke + e2e on future API 37, dual APKs + mappings, NetBird serve
-  of all four root APKs)
-- Product flavors: `compat` (minSdk 26, `app-release.apk` / `app-debug.apk`) and
-  `future` (minSdk 37, `app-release-future.apk` / `app-debug-future.apk`).
-  `./build.sh --publish` re-serves that same four-file set.
-- `./build.sh --smoke` / `--e2e` / `--smoke-shipped` / `--macrobenchmark`
-  (standalone GMD; default `./build.sh` already runs smoke + e2e + shippedsmoke.
-  Baselines regenerate when UI/startup sources change, or with `--force-baseline`; skipped by `--debug`)
-- Shared flock: `~/.cache/android-apps/build.lock` (do not delete while held)
-- Version bump runs on `baseVersionCode` / `baseVersionName` before the Gradle build;
-  a failed build reverts the bump.
+`build.sh` is shared with dustvalve_next, calc, and core. Only the PROJECT
+CONFIG block (signing property, GMD annotations, Gradle tasks, extra flags)
+differs. When you change shared behavior (publish, lock, JDK, version bump,
+serve helper), port it to the other three the same day.
 
-## Shared build.sh
+- Default `./build.sh` is the RELEASE path: bump deps, then bump
+  `baseVersionCode` / `baseVersionName`, then debug lints/tests + debug APKs,
+  maybe regen baseline+startup profiles, then release lint + assemble (no
+  `gradle clean`), then GMD shippedsmoke, then smoke + e2e sharing one API 37
+  Setup. Copies and NetBird-serves all four root APKs. A failed build reverts
+  the version bump. Requires `/dev/kvm`.
+- `./build.sh --debug`: bump deps, then debug lints/tests + debug APKs only.
+  Skip version bump, baseline regen, release assemble, and GMD. Serve the
+  debug pair (does not clobber root release APKs).
+- `./build.sh --publish`: re-serve existing root release + debug APKs (four
+  files). There is no `--publish-debug`.
+- `./build.sh --clean`: `gradle clean` + remove root APKs, then exit. The
+  default path does not clean.
+- `./build.sh --force-baseline`: with the release path, always regen AOT
+  profiles. Otherwise regen only when UI/startup sources are newer than the
+  committed profiles. `--debug` skips baselines.
+- Standalone GMD: `--smoke` / `--e2e` / `--smoke-shipped` / `--macrobenchmark`.
+  Shippedsmoke is release-path only (also `--smoke-shipped`). Smoke + e2e share
+  one API 37 Setup on the default path.
+- Product flavors: `compat` (minSdk 26, `app-release.apk` / `app-debug.apk`)
+  and `future` (minSdk 37, `app-release-future.apk` / `app-debug-future.apk`).
+- Shared flock: `~/.cache/android-apps/build.lock` (do not delete while held).
+  A second `./build.sh` waits.
 
-`build.sh` is the same script across dustvalve_next, calc, compass,
-and core except the PROJECT CONFIG block (signing
-property, GMD annotations, Gradle tasks, extra flags). When you change
-shared behavior (publish, lock, JDK, version bump, serve helper), port it
-to the other four the same day.
+## Gradle
+
+Compass already enables the build cache and configuration-cache
+(`org.gradle.configuration-cache=true`, `problems=warn`). Keep those on.
+`org.gradle.workers.max=8`. Kotlin daemon heap is `-Xmx3g`.
 
 ## Git workflow
 
