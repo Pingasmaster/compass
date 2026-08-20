@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Structural gate for the release-signing story (P0 #2 / P1 #114):
+# Structural gate for the release-signing story:
 #   - buildTypes.debug must NEVER assign the release signingConfig - a debug
 #     build must not be able to carry the production signature.
 #   - buildTypes.release must assign the release signingConfig.
@@ -59,7 +59,7 @@ DEBUG_BLOCK="$(extract_block "$BUILD_GRADLE" '^[[:space:]]*debug \\{')"
 [[ -n "$DEBUG_BLOCK" ]] || fail "could not locate buildTypes.debug {} in $BUILD_GRADLE"
 
 if echo "$DEBUG_BLOCK" | grep -q 'signingConfigs\.getByName("release")'; then
-    fail "buildTypes.debug in $BUILD_GRADLE assigns the release signingConfig - debug builds must use AGP debug signing only (P0 #2)."
+    fail "buildTypes.debug in $BUILD_GRADLE assigns the release signingConfig - debug builds must use AGP debug signing only."
 fi
 
 RELEASE_BLOCK="$(extract_block "$BUILD_GRADLE" '^[[:space:]]*release \\{')"

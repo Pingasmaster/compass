@@ -50,7 +50,7 @@ class DataStoreUserPreferences(private val context: Context) : UserPreferences {
 
     // Every per-key flow is distinctUntilChanged: DataStore emits a new snapshot
     // on every edit of the file, so without it each unrelated settings write
-    // re-notifies every collector (e.g. re-registering location updates when
+    // re-notifies every collector (e.g. re-requesting a declination fix when
     // only the theme changed).
     override val themeMode: Flow<ThemeMode> =
         safeData.map {

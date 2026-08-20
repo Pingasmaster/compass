@@ -11,13 +11,13 @@ android {
     compileSdk = 37
     // Compile against the 37.1 minor SDK release (API additions only; minor
     // SDKs carry no behavior changes and cannot be targeted - targetSdk
-    // stays at the 37 major). Matches calc / Brisky / dustvalve / STT.
+    // stays at the 37 major). Matches calc / dustvalve_next / core.
     compileSdkMinor = 1
 
     // Shared by defaultConfig + future flavor offset. build.sh bumps this
     // via sed; future re-reads it on the next Gradle configure.
-    val baseVersionCode = 45
-    val baseVersionName = "1.0.44"
+    val baseVersionCode = 46
+    val baseVersionName = "1.0.45"
 
     defaultConfig {
         applicationId = "com.compass.app"
@@ -25,6 +25,12 @@ android {
         versionCode = baseVersionCode
         versionName = baseVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    androidResources {
+        // APK Analyzer: strings type had 86 locales (AndroidX translations).
+        // English-only; density / night / API configs are kept.
+        localeFilters += "en"
     }
 
     // Single codebase, two APKs: compat (Android 8+) and future (Android 17+).
@@ -133,9 +139,16 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_26
         targetCompatibility = JavaVersion.VERSION_26
-        // Required for compat (minSdk 26 + JVM 26). Harmless no-op on future
-        // for APIs already present on Android 17; R8 strips unused bits.
+        // Required for compat (minSdk 26 + JVM 26). Analyzer found no j$.*
+        // desugar types in either release DEX (R8 strips unused bits on future).
         isCoreLibraryDesugaringEnabled = true
+    }
+
+    packaging {
+        resources {
+            excludes += "DebugProbesKt.bin"
+            excludes += "**/*.kotlin_builtins"
+        }
     }
 
     kotlin {
@@ -229,9 +242,9 @@ dependencies {
 
     implementation(libs.material3)
     implementation(libs.material3.adaptive)
-    implementation(libs.graphics.shapes)
 
     implementation(libs.activity.compose)
+    implementation(libs.androidx.core.splashscreen)
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.lifecycle.runtime.compose)
 
@@ -239,7 +252,7 @@ dependencies {
     implementation(libs.coroutines.android)
 
     // Profile installer is what ships the baseline + startup profiles baked into the
-    // release AAB. At install / first launch it copies the profiles from the APK
+    // release APK. At install / first launch it copies the profiles from the APK
     // into the profile-cache dir that the OS reads when compiling DEX.
     implementation(libs.androidx.profileinstaller)
 

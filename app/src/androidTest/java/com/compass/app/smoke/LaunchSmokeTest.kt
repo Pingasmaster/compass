@@ -17,9 +17,8 @@ private const val LAUNCH_TIMEOUT_MS = 60_000L
 /**
  * Tier 2 on-device smoke: cold-start keeps [PACKAGE] in the foreground.
  *
- * Grant ACCESS_COARSE_LOCATION before launch: first-run True North prompting
- * otherwise opens the system permission dialog (a different package) and
- * [By.pkg] never sees the compass window.
+ * Grant ACCESS_COARSE_LOCATION before launch so the run matches a user who
+ * already allowed True North. Launch itself no longer auto-prompts.
  */
 @SmokeTest
 @RunWith(AndroidJUnit4::class)

@@ -1,3 +1,5 @@
+@file:OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+
 package com.compass.app.ui.compass
 
 import androidx.lifecycle.SavedStateHandle
@@ -6,6 +8,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import com.compass.app.data.preferences.Responsiveness
 import com.compass.app.data.preferences.ThemeMode
+import com.compass.app.domain.location.LocationIssue
+import com.compass.app.domain.location.LocationRequestOutcome
 import com.compass.app.domain.model.CompassReading
 import com.compass.app.domain.model.GeoFix
 import com.compass.app.testing.FakeHeadingSource
@@ -14,7 +18,6 @@ import com.compass.app.testing.FakePermissionChecker
 import com.compass.app.testing.FakeUserPreferences
 import com.compass.app.testing.MainDispatcherRule
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -96,7 +99,7 @@ class CompassViewModelReconciliationTest {
     }
 
     @Test
-    fun `stopping readings collection stops location updates after the grace period`() = runTest {
+    fun `stopping readings collection stops location updates immediately`() = runTest {
         val prefs = FakeUserPreferences(initialTrueNorth = true)
         val heading = FakeHeadingSource()
         val location = FakeLocationProvider()
@@ -111,18 +114,14 @@ class CompassViewModelReconciliationTest {
 
         collector.cancel()
         runCurrent()
-        // WhileSubscribed's 5 s grace still holds the upstream open.
-        assertEquals(stopsBefore, location.stopCount)
-        assertTrue(location.active)
-
-        advanceTimeBy(5_001)
-        runCurrent()
+        // Zero stop timeout tears the sensor/location pipeline down on pause
+        // so a permission-dialog resume re-registers instead of freezing at 0.
         assertEquals(stopsBefore + 1, location.stopCount)
         assertFalse(location.active)
     }
 
     @Test
-    fun `resubscribing within the grace period does not restart location updates`() = runTest {
+    fun `resubscribing after unsubscribe requests a fresh location fix`() = runTest {
         val prefs = FakeUserPreferences(initialTrueNorth = true)
         val heading = FakeHeadingSource()
         val location = FakeLocationProvider()
@@ -135,14 +134,12 @@ class CompassViewModelReconciliationTest {
         assertEquals(1, location.requestCount)
 
         collector.cancel()
-        advanceTimeBy(1_000)
+        runCurrent()
         backgroundScope.launch { vm.readings.collect { } }
         runCurrent()
-        advanceTimeBy(10_000)
+        advanceUntilIdle()
 
-        // The upstream never stopped, readingsActive never flipped, and
-        // distinctUntilChanged suppressed a re-fire.
-        assertEquals(1, location.requestCount)
+        assertEquals(2, location.requestCount)
         assertTrue(location.active)
     }
 
@@ -207,7 +204,6 @@ class CompassViewModelReconciliationTest {
         assertTrue(location.active)
 
         collector.cancel()
-        advanceTimeBy(5_001)
         runCurrent()
         backgroundScope.launch { vm.readings.collect { } }
         runCurrent()
@@ -230,13 +226,70 @@ class CompassViewModelReconciliationTest {
         runCurrent()
         advanceUntilIdle()
 
-        // requestUpdates(headingSource::updateLocation) wiring + last-known seeding.
+        // requestFix(headingSource::updateLocation) wiring + last-known seeding.
         assertEquals(seeded, heading.fixes.first())
 
         val periodic = GeoFix(1.0, 2.0, 3.0, 456L)
         checkNotNull(location.lastOnFix).invoke(periodic)
         assertEquals(2, heading.fixes.size)
         assertEquals(periodic, heading.fixes.last())
+        assertNull(vm.locationIssue.value)
+    }
+
+    @Test
+    fun `missing last-known fix surfaces a waiting location issue until a fix arrives`() = runTest {
+        val prefs = FakeUserPreferences(initialTrueNorth = true)
+        val heading = FakeHeadingSource()
+        val location = FakeLocationProvider()
+        val permissions = FakePermissionChecker(granted = true)
+        val vm = createViewModel(prefs, heading, location, permissions)
+        backgroundScope.launch { vm.readings.collect { } }
+        runCurrent()
+        advanceUntilIdle()
+
+        assertEquals(LocationIssue.WAITING, vm.locationIssue.value)
+
+        val fix = GeoFix(48.85, 2.35, 35.0, 123L)
+        checkNotNull(location.lastOnFix).invoke(fix)
+        assertEquals(fix, heading.fixes.last())
+        assertNull(vm.locationIssue.value)
+    }
+
+    @Test
+    fun `disabled network provider surfaces a provider-disabled location issue`() = runTest {
+        val prefs = FakeUserPreferences(initialTrueNorth = true)
+        val heading = FakeHeadingSource()
+        val location = FakeLocationProvider()
+        location.outcome = LocationRequestOutcome.PROVIDER_DISABLED
+        val permissions = FakePermissionChecker(granted = true)
+        val vm = createViewModel(prefs, heading, location, permissions)
+        backgroundScope.launch { vm.readings.collect { } }
+        runCurrent()
+        advanceUntilIdle()
+
+        assertEquals(
+            LocationIssue.PROVIDER_DISABLED,
+            vm.locationIssue.value,
+        )
+        assertTrue(heading.fixes.isEmpty())
+    }
+
+    @Test
+    fun `disabling true north clears a waiting location issue`() = runTest {
+        val prefs = FakeUserPreferences(initialTrueNorth = true)
+        val heading = FakeHeadingSource()
+        val location = FakeLocationProvider()
+        val permissions = FakePermissionChecker(granted = true)
+        val vm = createViewModel(prefs, heading, location, permissions)
+        backgroundScope.launch { vm.readings.collect { } }
+        runCurrent()
+        advanceUntilIdle()
+        assertEquals(LocationIssue.WAITING, vm.locationIssue.value)
+
+        vm.settingsActions.onTrueNorthChange(false)
+        advanceUntilIdle()
+
+        assertNull(vm.locationIssue.value)
     }
 }
 
@@ -280,22 +333,6 @@ class CompassViewModelPermissionFlowTest {
         assertEquals(listOf(false), prefs.trueNorthWrites)
         assertEquals(0, location.requestCount)
         assertFalse(heading.trueNorthCalls.contains(true))
-    }
-
-    @Test
-    fun `markLocationPrompted persists the prompted flag only`() = runTest {
-        val prefs = FakeUserPreferences()
-        val heading = FakeHeadingSource()
-        val location = FakeLocationProvider()
-        val permissions = FakePermissionChecker(granted = true)
-        val vm = createViewModel(prefs, heading, location, permissions)
-        advanceUntilIdle()
-
-        vm.markLocationPrompted()
-        advanceUntilIdle()
-
-        assertEquals(listOf(true), prefs.locationPromptedWrites)
-        assertTrue(prefs.trueNorthWrites.isEmpty())
     }
 
     @Test
@@ -408,5 +445,52 @@ class CompassViewModelReadingsAndTargetTest {
         store.clear()
 
         assertEquals(stopsBefore + 1, location.stopCount)
+    }
+}
+
+class CompassPermissionUxTest {
+
+    @Test
+    fun `first ask uses the in-app rationale not app settings`() {
+        assertFalse(
+            needsAppSettingsForLocation(
+                hasPermission = false,
+                alreadyPrompted = false,
+                shouldShowRationale = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `after a deny the rationale path still uses the system dialog`() {
+        assertFalse(
+            needsAppSettingsForLocation(
+                hasPermission = false,
+                alreadyPrompted = true,
+                shouldShowRationale = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `permanent deny after prompting opens app settings`() {
+        assertTrue(
+            needsAppSettingsForLocation(
+                hasPermission = false,
+                alreadyPrompted = true,
+                shouldShowRationale = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `granted permission never needs app settings`() {
+        assertFalse(
+            needsAppSettingsForLocation(
+                hasPermission = true,
+                alreadyPrompted = true,
+                shouldShowRationale = false,
+            ),
+        )
     }
 }

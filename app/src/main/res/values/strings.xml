@@ -44,7 +44,24 @@
     <string name="settings_oled_dark">OLED dark theme</string>
     <string name="settings_oled_dark_desc">Pure black background in dark mode</string>
     <string name="settings_true_north">True north</string>
-    <string name="settings_true_north_desc">Correct heading with local magnetic declination</string>
+    <string name="settings_true_north_desc">Uses approximate location for local magnetic declination. Magnetic north still works without it.</string>
+
+    <!-- True north permission rationale -->
+    <string name="true_north_permission_title">Approximate location for true north</string>
+    <string name="true_north_permission_body">True north corrects the heading with your approximate location and an on-device magnetic model. Location stays on this device and is not used for tracking. Magnetic north still works if you skip.</string>
+    <string name="true_north_permission_continue">Continue</string>
+    <string name="true_north_permission_not_now">Not now</string>
+    <string name="true_north_permission_blocked_title">Location permission blocked</string>
+    <string name="true_north_permission_blocked_body">Location is blocked for Compass. Enable it in system settings to use true north, or keep using magnetic north.</string>
+    <string name="true_north_permission_open_settings">Open settings</string>
+
+    <!-- True north location status -->
+    <string name="location_banner_waiting_title">Getting location</string>
+    <string name="location_banner_waiting_body">Approximate location is used once to apply magnetic declination.</string>
+    <string name="location_banner_disabled_title">Location is off</string>
+    <string name="location_banner_disabled_body">Turn on location to use true north. Magnetic heading still works.</string>
+    <string name="location_banner_unavailable_title">Location unavailable</string>
+    <string name="location_banner_unavailable_body">This device has no location service. Magnetic heading still works.</string>
 
     <!-- Target angle sheet -->
     <string name="target_sheet_title">Target bearing</string>

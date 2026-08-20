@@ -14,8 +14,7 @@ private const val TARGET_PACKAGE = "com.compass.app"
  *
  * CUJs:
  *  1. cold_start_mainactivity
- *  2. grant_location_permission (best-effort)
- *  3. open settings / toggle true north (best-effort)
+ *  2. open settings / toggle true north (best-effort; may show an in-app rationale)
  *
  * Guest RAM/CPU is raised in scripts/gmd_ensure_avd.sh (4G / 6 cores).
  * Leave the app in the foreground when collect returns: MacrobenchmarkScope

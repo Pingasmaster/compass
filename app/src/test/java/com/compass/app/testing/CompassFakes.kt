@@ -4,6 +4,7 @@ import com.compass.app.data.preferences.Responsiveness
 import com.compass.app.data.preferences.ThemeMode
 import com.compass.app.data.preferences.UserPreferences
 import com.compass.app.domain.location.LocationProvider
+import com.compass.app.domain.location.LocationRequestOutcome
 import com.compass.app.domain.location.PermissionChecker
 import com.compass.app.domain.model.CompassReading
 import com.compass.app.domain.model.GeoFix
@@ -90,9 +91,9 @@ class FakeHeadingSource(override val hasSensor: Boolean = true) : HeadingSource 
 }
 
 /**
- * Recording [LocationProvider]. When [lastKnownFix] is set, [requestUpdates]
+ * Recording [LocationProvider]. When [lastKnownFix] is set, [requestFix]
  * invokes the callback synchronously, simulating the production
- * getLastKnownLocation seeding that happens before periodic registration.
+ * getLastKnownLocation seeding that happens before a one-shot refresh.
  */
 class FakeLocationProvider : LocationProvider {
     var requestCount = 0
@@ -100,12 +101,18 @@ class FakeLocationProvider : LocationProvider {
     var active = false
     var lastOnFix: ((GeoFix) -> Unit)? = null
     var lastKnownFix: GeoFix? = null
+    var outcome: LocationRequestOutcome = LocationRequestOutcome.REQUESTED
 
-    override fun requestUpdates(onFix: (GeoFix) -> Unit) {
+    override fun requestFix(onFix: (GeoFix) -> Unit): LocationRequestOutcome {
         requestCount += 1
-        active = true
         lastOnFix = onFix
+        if (outcome != LocationRequestOutcome.REQUESTED) {
+            active = false
+            return outcome
+        }
+        active = true
         lastKnownFix?.let(onFix)
+        return outcome
     }
 
     override fun stopUpdates() {

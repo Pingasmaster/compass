@@ -152,6 +152,10 @@ class CompassSensor(context: Context) : HeadingSource {
             }
         }
 
+        // Collection is tied to RESUMED with a zero WhileSubscribed timeout so
+        // this registration is torn down across the permission-dialog pause and
+        // rebuilt on resume. Leaving the listener registered is what froze the
+        // heading at 0 deg until the process was killed.
         manager.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_GAME)
         awaitClose {
             manager.unregisterListener(listener)

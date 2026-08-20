@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Copy GMD-generated baseline + startup profiles into :app's release source set.
-# Used by default ./build.sh (release path) after
-# :baselineprofile:pixel7aApi37ReleaseAndroidTest.
+# Used by the release path of ./build.sh after
+# :baselineprofile:pixel7aApi37FutureReleaseAndroidTest (only when UI/startup
+# sources are newer than the committed profiles, or with --force-baseline).
 #
 # With includeInStartupProfile=true (androidx.benchmark 1.5+), the collector
 # often emits only *-startup-prof*.txt (rules already carry SP/HSP markers).

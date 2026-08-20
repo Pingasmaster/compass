@@ -2,8 +2,7 @@
 # Guards against silently-green 0-test runs: a GMD invocation whose
 # instrumentation matches nothing (wrong annotation filter, renamed test
 # classes, runner mismatch) exits 0 with 'Starting 0 tests'. Parse the JUnit
-# XML, publish the executed count as a ::notice (public, API-readable), and
-# FAIL the job when nothing ran.
+# XML, print the executed count, and fail ./build.sh when nothing ran.
 # Usage: assert_tests_ran.sh <min-tests> [gradle-module-dir]
 # The module dir defaults to "app"; pass e.g. "shippedsmoke" for lanes whose
 # instrumentation lives in another module.

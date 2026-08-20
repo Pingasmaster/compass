@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.min
 import com.compass.app.data.preferences.Responsiveness
+import com.compass.app.domain.location.LocationIssue
 import com.compass.app.domain.model.CompassAccuracy
 
 /**
@@ -45,6 +46,7 @@ fun SinglePaneCompassBody(
     isTrueNorth: Boolean,
     declination: Float,
     accuracy: CompassAccuracy,
+    locationIssue: LocationIssue?,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -76,6 +78,7 @@ fun SinglePaneCompassBody(
         )
 
         CalibrationBanner(accuracy = accuracy)
+        LocationIssueBanner(issue = locationIssue)
 
         Spacer(Modifier.height(8.dp))
     }
@@ -98,6 +101,7 @@ fun DualPaneCompassBody(
     isTrueNorth: Boolean,
     declination: Float,
     accuracy: CompassAccuracy,
+    locationIssue: LocationIssue?,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -135,6 +139,7 @@ fun DualPaneCompassBody(
                 targetAngle = targetAngle,
             )
             CalibrationBanner(accuracy = accuracy)
+            LocationIssueBanner(issue = locationIssue)
         }
     }
 }

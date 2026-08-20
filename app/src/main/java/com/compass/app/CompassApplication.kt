@@ -8,11 +8,17 @@ import android.util.Log
 import com.compass.app.data.preferences.DataStoreUserPreferences
 import com.compass.app.data.preferences.UserPreferences
 import com.compass.app.util.isAtLeastR
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class CompassApplication : Application() {
 
     lateinit var userPreferences: UserPreferences
         private set
+
+    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     override fun onCreate() {
         super.onCreate()
@@ -21,11 +27,13 @@ class CompassApplication : Application() {
         // UI-thread work so the Looper's violation handler is in place for early calls.
         StrictModeBootstrap.init(this)
         userPreferences = DataStoreUserPreferences(this)
-        // Capture previous-process exit reasons on this launch so ANRs, OOMs, and native
-        // crashes that happened while the app was dead become visible in logcat instead
-        // of just "process died" with no diagnostic. ApplicationExitInfo is API 30+;
-        // compat (minSdk 26) early-returns below R so class verification stays safe.
-        capturePreviousExitReasons()
+        // Capture previous-process exit reasons off the main thread. Binder + the
+        // historical-exit cursor are not needed before first frame; ApplicationExitInfo
+        // is API 30+ and compat (minSdk 26) early-returns below R so class verification
+        // stays safe.
+        applicationScope.launch {
+            capturePreviousExitReasons()
+        }
     }
 
     /**

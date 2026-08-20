@@ -37,6 +37,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.compass.app.R
+import com.compass.app.domain.location.LocationIssue
 import com.compass.app.domain.model.CompassAccuracy
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -72,6 +73,74 @@ fun CalibrationBanner(accuracy: CompassAccuracy, modifier: Modifier = Modifier) 
                     )
                     Text(
                         text = stringResource(R.string.calibration_banner_body),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun LocationIssueBanner(issue: LocationIssue?, modifier: Modifier = Modifier) {
+    AnimatedVisibility(
+        visible = issue != null,
+        enter = fadeIn() + expandVertically(),
+        exit = fadeOut() + shrinkVertically(),
+        modifier = modifier,
+    ) {
+        val visibleIssue = issue ?: return@AnimatedVisibility
+        val (titleRes, bodyRes, showSpinner) = when (visibleIssue) {
+            LocationIssue.WAITING -> Triple(
+                R.string.location_banner_waiting_title,
+                R.string.location_banner_waiting_body,
+                true,
+            )
+
+            LocationIssue.PROVIDER_DISABLED -> Triple(
+                R.string.location_banner_disabled_title,
+                R.string.location_banner_disabled_body,
+                false,
+            )
+
+            LocationIssue.UNAVAILABLE -> Triple(
+                R.string.location_banner_unavailable_title,
+                R.string.location_banner_unavailable_body,
+                false,
+            )
+        }
+        Surface(
+            color = MaterialTheme.colorScheme.tertiaryContainer,
+            contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            shape = MaterialTheme.shapes.extraLarge,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (showSpinner) {
+                    ContainedLoadingIndicator(
+                        modifier = Modifier.size(44.dp),
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                        indicatorColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                    )
+                } else {
+                    Icon(
+                        painter = painterResource(R.drawable.ic_gps_fixed_24),
+                        contentDescription = null,
+                        modifier = Modifier.size(44.dp),
+                    )
+                }
+                Spacer(Modifier.width(16.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        text = stringResource(titleRes),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        text = stringResource(bodyRes),
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }

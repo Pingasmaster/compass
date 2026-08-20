@@ -13,7 +13,9 @@ import com.compass.app.data.location.AndroidPermissionChecker
 import com.compass.app.data.preferences.Responsiveness
 import com.compass.app.data.preferences.ThemeMode
 import com.compass.app.data.preferences.UserPreferences
+import com.compass.app.domain.location.LocationIssue
 import com.compass.app.domain.location.LocationProvider
+import com.compass.app.domain.location.LocationRequestOutcome
 import com.compass.app.domain.location.PermissionChecker
 import com.compass.app.domain.model.CompassReading
 import com.compass.app.domain.sensor.CompassSensor
@@ -31,6 +33,14 @@ import kotlinx.coroutines.launch
 
 private const val KEY_TARGET_ANGLE = "target_angle"
 private const val DEGREES_CIRCLE = 360f
+
+/**
+ * SensorManager listeners often go silent across the permission-dialog pause if
+ * they stay registered. Zero stop timeout tears the callbackFlow down on
+ * unsubscribe so resume re-registers and heading moves again. Pair with
+ * `collectAsStateWithLifecycle(minActiveState = RESUMED)`.
+ */
+internal const val READINGS_STOP_TIMEOUT_MS = 0L
 
 /** Wrap [degrees] into `[0, 360)`. */
 internal fun normalizeBearingDegrees(degrees: Float): Float = ((degrees % DEGREES_CIRCLE) + DEGREES_CIRCLE) % DEGREES_CIRCLE
@@ -57,24 +67,29 @@ class CompassViewModel(
 ) : ViewModel() {
 
     // True while the shared readings flow is collecting upstream, i.e. while the
-    // UI is (or was within the last 5 s) actually visible. Used to bound the
-    // location listener to UI visibility, mirroring the sensor registration.
+    // UI is resumed. Used to bound the one-shot location request to UI visibility,
+    // mirroring the sensor registration.
     private val readingsActive = MutableStateFlow(false)
 
-    // Sensor flow - stateIn drives registration via WhileSubscribed. The ViewModel no longer
-    // needs onResume/onPause hooks; the composable's `collectAsStateWithLifecycle` controls it.
+    // Sensor flow - stateIn drives registration via WhileSubscribed. Pause/resume
+    // is owned by collectAsStateWithLifecycle(RESUMED) plus a zero stop timeout:
+    // a 5 s grace left SensorManager registered through the permission dialog
+    // and the heading froze at the initial 0 deg until process death.
     val readings: StateFlow<CompassReading> =
         headingSource.readings
             .onStart { readingsActive.value = true }
             .onCompletion { readingsActive.value = false }
             .stateIn(
                 scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5_000),
+                started = SharingStarted.WhileSubscribed(READINGS_STOP_TIMEOUT_MS),
                 initialValue = CompassReading(hasSensor = headingSource.hasSensor),
             )
 
     private val _targetAngle = MutableStateFlow(savedState.get<Float?>(KEY_TARGET_ANGLE))
     val targetAngle: StateFlow<Float?> = _targetAngle.asStateFlow()
+
+    private val _locationIssue = MutableStateFlow<LocationIssue?>(null)
+    val locationIssue: StateFlow<LocationIssue?> = _locationIssue.asStateFlow()
 
     val settingsActions = SettingsActions(
         onThemeChange = { mode -> viewModelScope.launch { prefs.setThemeMode(mode) } },
@@ -90,11 +105,7 @@ class CompassViewModel(
         savedState[KEY_TARGET_ANGLE] = normalised
     }
 
-    fun markLocationPrompted() {
-        viewModelScope.launch { prefs.setLocationPrompted(true) }
-    }
-
-    /** Persists the one-shot system permission result; must outlive the composition. */
+    /** Persists the system permission result; must outlive the composition. */
     fun onLocationPermissionResult(granted: Boolean) {
         viewModelScope.launch {
             prefs.setLocationPrompted(true)
@@ -113,18 +124,37 @@ class CompassViewModel(
                     // showing magnetic readings.
                     if (enabled && !permissionChecker.hasCoarseLocationPermission()) {
                         prefs.setTrueNorth(false)
+                        _locationIssue.value = null
                         return@collect
                     }
                     headingSource.setTrueNorthEnabled(enabled)
-                    // Location updates only while the UI is actually collecting
-                    // readings: a backgrounded app should not keep an active
-                    // LocationManager registration alive.
+                    if (!enabled) {
+                        _locationIssue.value = null
+                    }
+                    // One-shot fix only while the UI is actually collecting
+                    // readings: a backgrounded app should not keep an in-flight
+                    // LocationManager request alive.
                     if (enabled && active) {
-                        locationProvider.requestUpdates(headingSource::updateLocation)
+                        requestDeclinationFix()
                     } else {
                         locationProvider.stopUpdates()
                     }
                 }
+        }
+    }
+
+    private fun requestDeclinationFix() {
+        var gotFix = false
+        val outcome = locationProvider.requestFix { fix ->
+            gotFix = true
+            headingSource.updateLocation(fix)
+            _locationIssue.value = null
+        }
+        _locationIssue.value = when (outcome) {
+            LocationRequestOutcome.REQUESTED -> if (gotFix) null else LocationIssue.WAITING
+            LocationRequestOutcome.MISSING_PERMISSION -> null
+            LocationRequestOutcome.PROVIDER_DISABLED -> LocationIssue.PROVIDER_DISABLED
+            LocationRequestOutcome.UNAVAILABLE -> LocationIssue.UNAVAILABLE
         }
     }
 

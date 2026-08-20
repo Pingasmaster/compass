@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Geometric "m." fitted to logo.png, scaled into the 108dp adaptive-icon
+     canvas at content ratio 0.44 (same padding generate-icons.sh used for PNGs). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M34.11,65.36 L34.11,42.18 A6.61,6.61 0 0 1 47.33,42.18 L47.33,65.36 M60.5,65.36 L60.5,42.18 A6.61,6.61 0 0 1 73.7,42.18 L73.7,65.36 M47.33,62.41 L60.5,62.41"
+        android:strokeWidth="7.78"
+        android:strokeColor="#FF000000"
+        android:strokeLineCap="square"
+        android:strokeLineJoin="round" />
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M69.66,72.26 a4.04,4.04 0 1 1 8.08,0 a4.04,4.04 0 1 1 -8.08,0" />
+</vector>

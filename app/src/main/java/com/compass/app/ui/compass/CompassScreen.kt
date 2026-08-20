@@ -1,9 +1,5 @@
 package com.compass.app.ui.compass
 
-import android.content.Context
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.ActivityResultLauncher
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -16,15 +12,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.window.core.layout.WindowSizeClass
 import com.compass.app.R
 import com.compass.app.data.preferences.Responsiveness
 import com.compass.app.data.preferences.UserPreferences
+import com.compass.app.domain.location.LocationIssue
 import com.compass.app.domain.model.CompassAccuracy
 import com.compass.app.domain.model.toCardinal
 import com.compass.app.ui.compass.components.CompassTargetFab
@@ -41,41 +38,71 @@ fun CompassScreen(
     modifier: Modifier = Modifier,
     viewModel: CompassViewModel = viewModel(factory = CompassViewModel.Factory),
 ) {
-    val context = LocalContext.current
     val prefs = viewModel.prefs
-
-    val reading by viewModel.readings.collectAsStateWithLifecycle()
+    val reading by viewModel.readings.collectAsStateWithLifecycle(
+        minActiveState = Lifecycle.State.RESUMED,
+    )
     val trueNorth by prefs.trueNorthEnabled.collectAsStateWithLifecycle(initialValue = false)
+    val locationPrompted by prefs.locationPrompted.collectAsStateWithLifecycle(initialValue = false)
     val responsiveness by prefs.responsiveness.collectAsStateWithLifecycle(
         initialValue = Responsiveness.NORMAL,
     )
     val targetAngle by viewModel.targetAngle.collectAsStateWithLifecycle()
+    val locationIssue by viewModel.locationIssue.collectAsStateWithLifecycle()
 
-    // rememberSaveable so an open sheet survives rotation / process death.
+    CompassTrueNorthPermissionGate(
+        alreadyPrompted = locationPrompted,
+        onPermissionResult = viewModel::onLocationPermissionResult,
+        onEnableTrueNorth = { viewModel.settingsActions.onTrueNorthChange(true) },
+    ) { requestTrueNorth ->
+        CompassScreenContent(
+            isDark = isDark,
+            roseAzimuth = reading.azimuth,
+            accuracy = reading.accuracy,
+            hasSensor = reading.hasSensor,
+            calibrating = reading.accuracy.needsCalibration,
+            isTrueNorth = trueNorth,
+            declination = reading.declination,
+            locationIssue = locationIssue,
+            targetAngle = targetAngle,
+            responsiveness = responsiveness,
+            prefs = prefs,
+            settingsActions = viewModel.settingsActions,
+            onRequestTrueNorth = requestTrueNorth,
+            onSetTargetAngle = viewModel::setTargetAngle,
+            modifier = modifier,
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun CompassScreenContent(
+    isDark: Boolean,
+    roseAzimuth: Float,
+    accuracy: CompassAccuracy,
+    hasSensor: Boolean,
+    calibrating: Boolean,
+    isTrueNorth: Boolean,
+    declination: Float,
+    locationIssue: LocationIssue?,
+    targetAngle: Float?,
+    responsiveness: Responsiveness,
+    prefs: UserPreferences,
+    settingsActions: SettingsActions,
+    onRequestTrueNorth: () -> Unit,
+    onSetTargetAngle: (Float?) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     var showSettings by rememberSaveable { mutableStateOf(false) }
     var showTargetDialog by rememberSaveable { mutableStateOf(false) }
-
-    val locationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-    ) { granted ->
-        // Persisted in viewModelScope: the writes must not be cancelled if the
-        // composition goes away right after the system permission dialog.
-        viewModel.onLocationPermissionResult(granted)
-    }
-
-    CompassTrueNorthPromptEffect(
-        prefs = prefs,
-        context = context,
-        launcher = locationPermissionLauncher,
-        onSkipPrompt = viewModel::markLocationPrompted,
-    )
 
     Scaffold(
         modifier = modifier,
         topBar = {
             CompassTopBar(
-                accuracy = reading.accuracy,
-                hasSensor = reading.hasSensor,
+                accuracy = accuracy,
+                hasSensor = hasSensor,
                 onSettings = { showSettings = true },
             )
         },
@@ -88,14 +115,15 @@ fun CompassScreen(
     ) { innerPadding ->
         CompassScaffoldBody(
             modifier = Modifier.fillMaxSize().padding(innerPadding),
-            roseAzimuth = reading.azimuth,
+            roseAzimuth = roseAzimuth,
             isDark = isDark,
-            calibrating = reading.accuracy.needsCalibration,
+            calibrating = calibrating,
             targetAngle = targetAngle,
             responsiveness = responsiveness,
-            isTrueNorth = trueNorth,
-            declination = reading.declination,
-            accuracy = reading.accuracy,
+            isTrueNorth = isTrueNorth,
+            declination = declination,
+            accuracy = accuracy,
+            locationIssue = locationIssue,
         )
     }
 
@@ -103,14 +131,13 @@ fun CompassScreen(
         showTargetDialog = showTargetDialog,
         showSettings = showSettings,
         targetAngle = targetAngle,
-        trueNorth = trueNorth,
+        trueNorth = isTrueNorth,
         responsiveness = responsiveness,
         prefs = prefs,
-        settingsActions = viewModel.settingsActions,
-        context = context,
-        locationPermissionLauncher = locationPermissionLauncher,
+        settingsActions = settingsActions,
+        onRequestTrueNorth = onRequestTrueNorth,
         onTargetConfirm = { value ->
-            viewModel.setTargetAngle(value)
+            onSetTargetAngle(value)
             showTargetDialog = false
         },
         onTargetDismiss = { showTargetDialog = false },
@@ -127,8 +154,7 @@ private fun CompassScreenSheets(
     responsiveness: Responsiveness,
     prefs: UserPreferences,
     settingsActions: SettingsActions,
-    context: Context,
-    locationPermissionLauncher: ActivityResultLauncher<String>,
+    onRequestTrueNorth: () -> Unit,
     onTargetConfirm: (Float?) -> Unit,
     onTargetDismiss: () -> Unit,
     onSettingsDismiss: () -> Unit,
@@ -146,8 +172,7 @@ private fun CompassScreenSheets(
             actions = settingsActions,
             trueNorth = trueNorth,
             responsiveness = responsiveness,
-            context = context,
-            locationPermissionLauncher = locationPermissionLauncher,
+            onRequestTrueNorth = onRequestTrueNorth,
             onDismiss = onSettingsDismiss,
         )
     }
@@ -163,6 +188,7 @@ private fun CompassScaffoldBody(
     isTrueNorth: Boolean,
     declination: Float,
     accuracy: CompassAccuracy,
+    locationIssue: LocationIssue?,
     modifier: Modifier = Modifier,
 ) {
     val windowSizeClass = currentWindowAdaptiveInfoV2().windowSizeClass
@@ -205,6 +231,7 @@ private fun CompassScaffoldBody(
             isTrueNorth = isTrueNorth,
             declination = declination,
             accuracy = accuracy,
+            locationIssue = locationIssue,
         )
     } else {
         SinglePaneCompassBody(
@@ -218,6 +245,7 @@ private fun CompassScaffoldBody(
             isTrueNorth = isTrueNorth,
             declination = declination,
             accuracy = accuracy,
+            locationIssue = locationIssue,
         )
     }
 }

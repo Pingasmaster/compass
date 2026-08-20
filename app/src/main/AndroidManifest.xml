@@ -23,7 +23,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Compass"
+        android:theme="@style/Theme.Compass.Splash"
         tools:targetApi="33">
         <!--
           Enables platform profiling for Macrobenchmark + Baseline Profile generation

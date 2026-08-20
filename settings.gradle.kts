@@ -1,6 +1,6 @@
 // Compass - settings.gradle.kts
 //
-// Modernized for Gradle 9.7.0:
+// Modernized for Gradle 9.7.1:
 //   - foojay-resolver-convention: JDK toolchain auto-provisioning (daemon JVM 26)
 //   - enableFeaturePreview("NO_IMPLICIT_LOOKUP_IN_PARENT_PROJECTS"): adopt Gradle 10 behavior
 //     (eliminates implicit project.properties() / findProperty() / hasProperty() lookups in
