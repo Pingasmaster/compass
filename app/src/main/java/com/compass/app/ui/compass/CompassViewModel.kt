@@ -56,6 +56,7 @@ class SettingsActions(
     val onOledBlackChange: (Boolean) -> Unit,
     val onTrueNorthChange: (Boolean) -> Unit,
     val onResponsivenessChange: (Responsiveness) -> Unit,
+    val onAutoUpdateCheckChange: (Boolean) -> Unit,
 )
 
 class CompassViewModel(
@@ -97,6 +98,7 @@ class CompassViewModel(
         onOledBlackChange = { enabled -> viewModelScope.launch { prefs.setOledBlack(enabled) } },
         onTrueNorthChange = { enabled -> viewModelScope.launch { prefs.setTrueNorth(enabled) } },
         onResponsivenessChange = { mode -> viewModelScope.launch { prefs.setResponsiveness(mode) } },
+        onAutoUpdateCheckChange = { enabled -> viewModelScope.launch { prefs.setAutoUpdateCheckEnabled(enabled) } },
     )
 
     fun setTargetAngle(value: Float?) {

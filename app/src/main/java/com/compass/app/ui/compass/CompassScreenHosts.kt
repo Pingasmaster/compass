@@ -25,6 +25,8 @@ import androidx.core.app.ActivityCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.compass.app.BuildConfig
+import com.compass.app.CompassApplication
 import com.compass.app.R
 import com.compass.app.data.preferences.Responsiveness
 import com.compass.app.data.preferences.ThemeMode
@@ -121,6 +123,8 @@ internal fun CompassSettingsHost(
     val themeMode by prefs.themeMode.collectAsStateWithLifecycle(initialValue = ThemeMode.SYSTEM)
     val dynamicColor by prefs.dynamicColorEnabled.collectAsStateWithLifecycle(initialValue = true)
     val oledBlack by prefs.oledBlackEnabled.collectAsStateWithLifecycle(initialValue = false)
+    val autoUpdateCheck by prefs.autoUpdateCheckEnabled.collectAsStateWithLifecycle(initialValue = true)
+    val app = LocalContext.current.applicationContext as CompassApplication
     // Writes go through SettingsActions (viewModelScope) instead of a
     // rememberCoroutineScope: this host leaves composition the moment the
     // sheet is dismissed, which would cancel any in-flight DataStore edit
@@ -131,6 +135,8 @@ internal fun CompassSettingsHost(
         oledBlack = oledBlack,
         trueNorth = trueNorth,
         responsiveness = responsiveness,
+        autoUpdateCheck = autoUpdateCheck,
+        versionName = BuildConfig.VERSION_NAME,
         onThemeChange = actions.onThemeChange,
         onDynamicColorChange = actions.onDynamicColorChange,
         onOledBlackChange = actions.onOledBlackChange,
@@ -142,6 +148,8 @@ internal fun CompassSettingsHost(
             }
         },
         onResponsivenessChange = actions.onResponsivenessChange,
+        onAutoUpdateCheckChange = actions.onAutoUpdateCheckChange,
+        onCheckForUpdates = { app.appUpdateController.checkManually() },
         onDismiss = onDismiss,
     )
 }

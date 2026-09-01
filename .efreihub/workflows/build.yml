@@ -1,0 +1,66 @@
+# Forge-native CI on every push. The colocated runner executes `run:` steps
+# inside bubblewrap (not Docker): unshared namespaces, cap-drop ALL, no
+# docker.sock. `actions/checkout` is skipped (tree exported without `.git`).
+# Other `uses:` fail closed.
+#
+# This job runs ./scripts/ci.sh: debug lints/tests/APKs, release
+# lint/assemble (without -Pcompass.requireReleaseSigning), ELF check,
+# and (when /dev/kvm is in the jail) shippedsmoke + smoke + hermetic e2e.
+# After a green ci.sh it runs ./scripts/publish_ci_release.sh: signed
+# assemble, next patch git tag, efreihub release, and two fat APKs
+# (compat + future). Publish is skipped when EFREIHUB_TOKEN is unset.
+#
+# Operator runner flags this Android job needs (CLI, not workflow YAML):
+#   --sandbox-share-net              Maven/Google downloads (default bwrap has no net)
+#   --sandbox-host-tools             plus JDK 26 under /usr and ANDROID_HOME bind
+#   --sandbox-efreihub-token-file    write PAT (ehp_...) injected as EFREIHUB_TOKEN
+#   --sandbox-efreihub-token-repo    admin/compass
+# Signing: bind release-keystore.jks + .password-signing-keys at
+# /usr/local/compass-signing (read-only /usr) or the job workdir.
+# GMD needs /dev/kvm in the jail; without it CI skips device gates.
+#
+# concurrency.group is a constant so a newer push cancels the in-flight job
+# from the previous push (any branch).
+name: ci
+
+on: push
+
+jobs:
+  ci:
+    runs-on: self-hosted
+    concurrency:
+      group: ci
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: toolchain
+        run: |
+          set -eu
+          uname -srm
+          sed -n 's/^ID=//p' /etc/os-release
+          test ! -f /.dockerenv
+          test ! -e /var/run/docker.sock
+          test ! -e /run/docker.sock
+          java -version
+          test -x ./gradlew
+          test -x ./scripts/ci.sh
+          test -f ./scripts/publish_ci_release.sh
+
+      - name: ascii and signing structure
+        run: |
+          set -eu
+          ./scripts/check_ascii.sh
+          ./scripts/check_release_signing_gate.sh
+
+      - name: scripts/ci.sh
+        run: |
+          set -eu
+          chmod +x ./scripts/ci.sh
+          ./scripts/ci.sh
+
+      - name: publish tagged release
+        run: |
+          set -eu
+          chmod +x ./scripts/publish_ci_release.sh
+          ./scripts/publish_ci_release.sh

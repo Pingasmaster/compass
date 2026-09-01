@@ -7,15 +7,21 @@ import android.content.ComponentCallbacks2
 import android.util.Log
 import com.compass.app.data.preferences.DataStoreUserPreferences
 import com.compass.app.data.preferences.UserPreferences
+import com.compass.app.update.AppUpdateController
+import com.compass.app.update.AppUpdateService
 import com.compass.app.util.isAtLeastR
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
 
 class CompassApplication : Application() {
 
     lateinit var userPreferences: UserPreferences
+        private set
+
+    lateinit var appUpdateController: AppUpdateController
         private set
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -27,6 +33,13 @@ class CompassApplication : Application() {
         // UI-thread work so the Looper's violation handler is in place for early calls.
         StrictModeBootstrap.init(this)
         userPreferences = DataStoreUserPreferences(this)
+        // No callTimeout: APK downloads can outlive a 30s whole-call cap.
+        val updateClient = OkHttpClient.Builder().build()
+        val updateService = AppUpdateService(updateClient, this, Dispatchers.IO)
+        appUpdateController = AppUpdateController(updateService, userPreferences, Dispatchers.IO)
+        // Fire-and-forget update check. One-shot per process; the controller
+        // swallows errors + mutates shared state that MainActivity observes.
+        appUpdateController.checkSilently()
         // Capture previous-process exit reasons off the main thread. Binder + the
         // historical-exit cursor are not needed before first frame; ApplicationExitInfo
         // is API 30+ and compat (minSdk 26) early-returns below R so class verification
@@ -84,7 +97,9 @@ class CompassApplication : Application() {
         when (level) {
             ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN,
             ComponentCallbacks2.TRIM_MEMORY_BACKGROUND,
-            -> Unit
+            -> if (::appUpdateController.isInitialized) {
+                appUpdateController.releaseOnTrim()
+            }
 
             ComponentCallbacks2.TRIM_MEMORY_COMPLETE,
             ComponentCallbacks2.TRIM_MEMORY_MODERATE,

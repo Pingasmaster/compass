@@ -7,15 +7,29 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.compass.app.data.preferences.ThemeMode
 import com.compass.app.ui.compass.CompassScreen
 import com.compass.app.ui.theme.CompassTheme
+import com.compass.app.ui.update.AppUpdateDialog
+import com.compass.app.ui.update.FutureUpgradeDialog
+import com.compass.app.update.UpdateUiState
 
 class MainActivity : ComponentActivity() {
+
+    private val appUpdateController
+        get() = (application as CompassApplication).appUpdateController
+
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
@@ -25,6 +39,7 @@ class MainActivity : ComponentActivity() {
         )
 
         val prefs = (application as CompassApplication).userPreferences
+        val controller = appUpdateController
 
         setContent {
             val themeMode by prefs.themeMode.collectAsStateWithLifecycle(initialValue = ThemeMode.SYSTEM)
@@ -50,13 +65,50 @@ class MainActivity : ComponentActivity() {
                 enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
             }
 
+            val updateState by controller.state.collectAsStateWithLifecycle()
+            val showFutureUpgrade by controller.showFutureUpgradePrompt.collectAsStateWithLifecycle()
+            val snackbarHostState = remember { SnackbarHostState() }
+            LaunchedEffect(controller) {
+                controller.maybeOfferFutureUpgrade()
+            }
+            LaunchedEffect(controller) {
+                controller.messages.collect { resId ->
+                    snackbarHostState.showSnackbar(getString(resId))
+                }
+            }
+
             CompassTheme(
                 darkTheme = isDark,
                 dynamicColor = dynamicColor,
                 oledBlack = oledBlack,
             ) {
-                CompassScreen(isDark = isDark)
+                Box(modifier = Modifier.fillMaxSize()) {
+                    CompassScreen(isDark = isDark)
+                    SnackbarHost(
+                        hostState = snackbarHostState,
+                        modifier = Modifier.align(Alignment.BottomCenter),
+                    )
+                }
+
+                AppUpdateDialog(
+                    state = updateState,
+                    onConfirmDownload = { controller.confirmDownload() },
+                    onDismiss = { controller.dismiss() },
+                )
+
+                val updateBusy = updateState !is UpdateUiState.Idle
+                FutureUpgradeDialog(
+                    visible = showFutureUpgrade && !updateBusy,
+                    onNo = { controller.declineFutureUpgrade() },
+                    onNotNow = { controller.deferFutureUpgrade() },
+                    onOk = { controller.upgradeToFutureNow() },
+                )
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        appUpdateController.retryPendingInstallIfReady()
     }
 }

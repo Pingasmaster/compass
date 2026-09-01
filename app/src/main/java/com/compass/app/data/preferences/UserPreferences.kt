@@ -22,6 +22,8 @@ interface UserPreferences {
     val trueNorthEnabled: Flow<Boolean>
     val locationPrompted: Flow<Boolean>
     val responsiveness: Flow<Responsiveness>
+    val autoUpdateCheckEnabled: Flow<Boolean>
+    val futureUpgradeChoice: Flow<String>
 
     suspend fun setThemeMode(mode: ThemeMode)
 
@@ -34,4 +36,8 @@ interface UserPreferences {
     suspend fun setResponsiveness(mode: Responsiveness)
 
     suspend fun setLocationPrompted(value: Boolean)
+
+    suspend fun setAutoUpdateCheckEnabled(enabled: Boolean)
+
+    suspend fun setFutureUpgradeChoice(choice: String)
 }

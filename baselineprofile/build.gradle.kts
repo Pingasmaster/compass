@@ -5,6 +5,7 @@ plugins {
 android {
     namespace = "com.compass.app.baselineprofile"
     compileSdk = 37
+    buildToolsVersion = "37.0.0"
 
     targetProjectPath = ":app"
 

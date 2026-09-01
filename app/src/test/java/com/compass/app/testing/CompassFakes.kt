@@ -1,5 +1,6 @@
 package com.compass.app.testing
 
+import com.compass.app.data.preferences.FutureUpgradeChoices
 import com.compass.app.data.preferences.Responsiveness
 import com.compass.app.data.preferences.ThemeMode
 import com.compass.app.data.preferences.UserPreferences
@@ -27,6 +28,8 @@ class FakeUserPreferences(initialTrueNorth: Boolean = false, initialLocationProm
     val trueNorthState = MutableStateFlow(initialTrueNorth)
     val locationPromptedState = MutableStateFlow(initialLocationPrompted)
     val responsivenessState = MutableStateFlow(Responsiveness.NORMAL)
+    val autoUpdateCheckState = MutableStateFlow(true)
+    val futureUpgradeChoiceState = MutableStateFlow(FutureUpgradeChoices.UNSET)
 
     val themeWrites = mutableListOf<ThemeMode>()
     val dynamicColorWrites = mutableListOf<Boolean>()
@@ -34,6 +37,8 @@ class FakeUserPreferences(initialTrueNorth: Boolean = false, initialLocationProm
     val trueNorthWrites = mutableListOf<Boolean>()
     val responsivenessWrites = mutableListOf<Responsiveness>()
     val locationPromptedWrites = mutableListOf<Boolean>()
+    val autoUpdateCheckWrites = mutableListOf<Boolean>()
+    val futureUpgradeChoiceWrites = mutableListOf<String>()
 
     override val themeMode: Flow<ThemeMode> = themeModeState
     override val dynamicColorEnabled: Flow<Boolean> = dynamicColorState
@@ -41,6 +46,8 @@ class FakeUserPreferences(initialTrueNorth: Boolean = false, initialLocationProm
     override val trueNorthEnabled: Flow<Boolean> = trueNorthState
     override val locationPrompted: Flow<Boolean> = locationPromptedState
     override val responsiveness: Flow<Responsiveness> = responsivenessState
+    override val autoUpdateCheckEnabled: Flow<Boolean> = autoUpdateCheckState
+    override val futureUpgradeChoice: Flow<String> = futureUpgradeChoiceState
 
     override suspend fun setThemeMode(mode: ThemeMode) {
         themeWrites += mode
@@ -70,6 +77,16 @@ class FakeUserPreferences(initialTrueNorth: Boolean = false, initialLocationProm
     override suspend fun setLocationPrompted(value: Boolean) {
         locationPromptedWrites += value
         locationPromptedState.value = value
+    }
+
+    override suspend fun setAutoUpdateCheckEnabled(enabled: Boolean) {
+        autoUpdateCheckWrites += enabled
+        autoUpdateCheckState.value = enabled
+    }
+
+    override suspend fun setFutureUpgradeChoice(choice: String) {
+        futureUpgradeChoiceWrites += choice
+        futureUpgradeChoiceState.value = choice
     }
 }
 

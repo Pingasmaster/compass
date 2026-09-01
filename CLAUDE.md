@@ -11,8 +11,19 @@ user first (unless they already authorized that path). See Cursor rule
 
 NO NON-ASCII CHARACTERS ALLOWED. Em-dashes, fancy quotes, and all other non-ASCII characters are forbidden. Use ASCII , . ; : and ' " quotes only.
 
-Enforced by `scripts/check_ascii.sh`: `./build.sh` hard-fails on violations.
-No GitHub Actions workflows - all gates run locally via `./build.sh`.
+Enforced by `scripts/check_ascii.sh`: `./scripts/ci.sh` and `./build.sh`
+hard-fail on violations. Localization resources under `src/main/res/values*`
+are exempt.
+
+## CI
+
+Pure efreihub CI: `.efreihub/workflows/build.yml` runs `scripts/ci.sh` then
+`scripts/publish_ci_release.sh`. No GitHub Actions. `build.sh` is the local
+entrypoint only (deps bump, version bump, APK copy/serve). CI does not bump
+the catalog or committed version; publish injects `-Pcompass.versionName` and
+`-Pcompass.versionCode`. Repo is `admin/compass`. Signing files at
+`/usr/local/compass-signing` or the repo root. Fat APKs:
+`app-release.apk` (compat) and `app-release-future.apk` (future).
 
 ## Local pipeline
 
@@ -40,8 +51,10 @@ serve helper), port it to the other three the same day.
 - Standalone GMD: `--smoke` / `--e2e` / `--smoke-shipped` / `--macrobenchmark`.
   Shippedsmoke is release-path only (also `--smoke-shipped`). Smoke + e2e share
   one API 37 Setup on the default path.
-- Product flavors: `compat` (minSdk 26, `app-release.apk` / `app-debug.apk`)
-  and `future` (minSdk 37, `app-release-future.apk` / `app-debug-future.apk`).
+- Product flavors: `compat` (minSdk 26, fat ABIs armeabi-v7a/arm64-v8a/x86/x86_64/riscv64,
+  `app-release.apk` / `app-debug.apk`) and `future` (minSdk 37, fat ABIs
+  arm64-v8a/x86_64/riscv64, `app-release-future.apk` / `app-debug-future.apk`).
+  No ABI splits; `ndk.abiFilters` on each flavor.
 - Shared flock: `~/.cache/android-apps/build.lock` (do not delete while held).
   A second `./build.sh` waits.
 

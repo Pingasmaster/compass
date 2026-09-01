@@ -33,6 +33,8 @@ class DataStoreUserPreferences(private val context: Context) : UserPreferences {
     private val trueNorthKey = booleanPreferencesKey("true_north")
     private val responsivenessKey = stringPreferencesKey("responsiveness")
     private val locationPromptedKey = booleanPreferencesKey("location_prompted")
+    private val autoUpdateCheckKey = booleanPreferencesKey("auto_update_check")
+    private val futureUpgradeChoiceKey = stringPreferencesKey("future_upgrade_choice")
 
     // Fall back to an empty preferences snapshot on IOException (no free inode,
     // SELinux denial) so a broken prefs store degrades to defaults instead of
@@ -73,6 +75,12 @@ class DataStoreUserPreferences(private val context: Context) : UserPreferences {
     override val locationPrompted: Flow<Boolean> =
         safeData.map { it[locationPromptedKey] ?: false }.distinctUntilChanged()
 
+    override val autoUpdateCheckEnabled: Flow<Boolean> =
+        safeData.map { it[autoUpdateCheckKey] ?: true }.distinctUntilChanged()
+
+    override val futureUpgradeChoice: Flow<String> =
+        safeData.map { it[futureUpgradeChoiceKey] ?: FutureUpgradeChoices.UNSET }.distinctUntilChanged()
+
     override val responsiveness: Flow<Responsiveness> =
         safeData.map {
             when (it[responsivenessKey]) {
@@ -109,6 +117,10 @@ class DataStoreUserPreferences(private val context: Context) : UserPreferences {
     override suspend fun setTrueNorth(enabled: Boolean) = writePrefs { it[trueNorthKey] = enabled }
 
     override suspend fun setLocationPrompted(value: Boolean) = writePrefs { it[locationPromptedKey] = value }
+
+    override suspend fun setAutoUpdateCheckEnabled(enabled: Boolean) = writePrefs { it[autoUpdateCheckKey] = enabled }
+
+    override suspend fun setFutureUpgradeChoice(choice: String) = writePrefs { it[futureUpgradeChoiceKey] = choice }
 
     // DataStore.edit is atomic: on IOException the previous value is preserved, so
     // logging + swallowing is enough to keep a background write failure from crashing

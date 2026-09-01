@@ -41,11 +41,15 @@ fun SettingsSheet(
     oledBlack: Boolean,
     trueNorth: Boolean,
     responsiveness: Responsiveness,
+    autoUpdateCheck: Boolean,
+    versionName: String,
     onThemeChange: (ThemeMode) -> Unit,
     onDynamicColorChange: (Boolean) -> Unit,
     onOledBlackChange: (Boolean) -> Unit,
     onTrueNorthChange: (Boolean) -> Unit,
     onResponsivenessChange: (Responsiveness) -> Unit,
+    onAutoUpdateCheckChange: (Boolean) -> Unit,
+    onCheckForUpdates: () -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -188,8 +192,64 @@ fun SettingsSheet(
                     onTrueNorthChange(it)
                 },
             )
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Spacer(Modifier.height(12.dp))
+            SettingsAboutSection(
+                versionName = versionName,
+                autoUpdateCheck = autoUpdateCheck,
+                onAutoUpdateCheckChange = {
+                    haptics.tick()
+                    onAutoUpdateCheckChange(it)
+                },
+                onCheckForUpdates = onCheckForUpdates,
+            )
             Spacer(Modifier.height(24.dp))
         }
+    }
+}
+
+@Composable
+private fun SettingsAboutSection(
+    versionName: String,
+    autoUpdateCheck: Boolean,
+    onAutoUpdateCheckChange: (Boolean) -> Unit,
+    onCheckForUpdates: () -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        SectionLabel(stringResource(R.string.settings_section_about))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.settings_version),
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                text = versionName,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Text(
+            text = stringResource(R.string.settings_check_for_updates),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onCheckForUpdates)
+                .padding(vertical = 12.dp),
+        )
+        ToggleRow(
+            titleRes = R.string.settings_auto_update_title,
+            subtitleRes = R.string.settings_auto_update_desc,
+            checked = autoUpdateCheck,
+            onCheckedChange = onAutoUpdateCheckChange,
+        )
     }
 }
 

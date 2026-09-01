@@ -2,14 +2,15 @@
 # Fail if any arm64 ELF shared object has a PT_LOAD Align below 16 KiB.
 # Android 15+ devices with 16 KB pages reject under-aligned .so at load time.
 #
-# Runs AFTER the Gradle build (see build.sh). merged_native_libs is the only
-# place our own CMake output (libblake3jni.so) and dependency libs
-# (LiteRT-LM, androidx graphics-path, datastore) can be checked - checking
+# Runs AFTER Gradle assemble (see scripts/ci.sh and build.sh).
+# merged_native_libs is the only place packaged dependency libs
+# (androidx graphics-path and datastore shared-counter AARs) can be
+# checked - this repo compiles no native code of its own - and checking
 # only the source tree would have passed while the shipped APK was 4 KB-aligned.
 #
-# Optional argv: APK paths (build.sh passes GRADLE_APK_*). When present, also
-# run `zipalign -c -P 16 4` on each APK if zipalign exists under Android SDK
-# build-tools. Missing zipalign is a warning, not a hard fail.
+# Optional argv: APK paths (ci.sh / build.sh pass GRADLE_APK_*). When present,
+# also run `zipalign -c -P 16 4` on each APK if zipalign exists under Android
+# SDK build-tools. Missing zipalign is a warning, not a hard fail.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

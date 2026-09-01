@@ -17,10 +17,18 @@ complexity:
   LongMethod:
     active: true
     allowedLines: 80
+  TooManyFunctions:
+    active: true
+    allowedFunctionsPerClass: 25
+    allowedFunctionsPerObject: 25
+    allowedFunctionsPerFile: 25
+    allowedFunctionsPerInterface: 25
+    allowedFunctionsPerEnum: 25
   LongParameterList:
     active: true
     allowedFunctionParameters: 8
     allowedConstructorParameters: 8
+    ignoreDefaultParameters: true
     ignoreAnnotatedParameter: ['Composable', 'Preview']
 
 empty-blocks:

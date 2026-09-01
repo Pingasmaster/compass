@@ -8,20 +8,22 @@
 #     compass.requireReleaseSigning and hard-fail (throw GradleException)
 #     when the keystore is missing, so a real release build can never
 #     silently fall back to debug signing.
-#   - build.sh's release path (everything except --debug) must actually pass
-#     -Pcompass.requireReleaseSigning=true, or the Gradle-side gate above
-#     is never armed.
+#   - scripts/ci.sh must document that production efreihub-release assemble
+#     must pass -Pcompass.requireReleaseSigning=true, or the Gradle-side
+#     gate above is never armed. Local ./build.sh still passes the same
+#     property on its release path.
 #
 # This is a static/structural check, not a Gradle TestKit run: this repo has
 # no buildSrc / build-logic module, and adding one only to host a single
 # testable Kotlin helper was judged not worth a whole extra module. Kept in
-# scripts/ next to check_ascii.sh and wired into build.sh the same way: a
-# hard-fail gate that runs on every build, not a comment or a doc note.
+# scripts/ next to check_ascii.sh and wired into scripts/ci.sh the same way:
+# a hard-fail gate that runs on every CI build, not a comment or a doc note.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 BUILD_GRADLE="$ROOT_DIR/app/build.gradle.kts"
+CI_SH="$ROOT_DIR/scripts/ci.sh"
 BUILD_SH="$ROOT_DIR/build.sh"
 
 fail() {
@@ -30,12 +32,13 @@ fail() {
 }
 
 [[ -f "$BUILD_GRADLE" ]] || fail "$BUILD_GRADLE not found"
+[[ -f "$CI_SH" ]] || fail "$CI_SH not found"
 [[ -f "$BUILD_SH" ]] || fail "$BUILD_SH not found"
 
 # Prints the balanced-brace block starting at the first line in file $1
 # matching regex $2, up to (and including) the line where the brace depth
 # returns to zero. Depends on the Kotlin DSL braces being well-formed, which
-# ktlint/detekt already enforce elsewhere in build.sh.
+# ktlint/detekt already enforce elsewhere in CI.
 extract_block() {
     awk -v pat="$2" '
         BEGIN { depth = 0; capturing = 0 }
@@ -76,6 +79,9 @@ echo "$SIGNING_BLOCK" | grep -q 'gradleProperty("compass.requireReleaseSigning")
 
 echo "$SIGNING_BLOCK" | grep -q 'throw GradleException' \
     || fail "signingConfigs release block no longer hard-fails when the keystore is missing"
+
+grep -q -- '-Pcompass.requireReleaseSigning=true' "$CI_SH" \
+    || fail "$CI_SH no longer documents -Pcompass.requireReleaseSigning=true for production efreihub-release assemble"
 
 grep -q -- '-Pcompass.requireReleaseSigning=true' "$BUILD_SH" \
     || fail "$BUILD_SH no longer passes -Pcompass.requireReleaseSigning=true on the release path"

@@ -11,6 +11,7 @@ plugins {
 android {
     namespace = "com.compass.app.macrobenchmark"
     compileSdk = 37
+    buildToolsVersion = "37.0.0"
 
     targetProjectPath = ":app"
 

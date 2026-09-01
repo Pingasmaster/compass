@@ -13,6 +13,24 @@
         android:required="false" />
 
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
+    <!--
+        Package-visibility carve-out for the self-update flow: without this,
+        API 30+ hides the system package installer from
+        AppUpdateService.resolveSystemInstallerPackage()'s
+        queryIntentActivities() call, the pinning branch silently never runs,
+        and the handoff degrades to an unpinned implicit VIEW +
+        package-archive intent that any app registering the filter could
+        intercept.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="application/vnd.android.package-archive" />
+        </intent>
+    </queries>
 
     <application
         android:name=".CompassApplication"
@@ -24,6 +42,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Compass.Splash"
+        android:networkSecurityConfig="@xml/network_security_config"
         tools:targetApi="33">
         <!--
           Enables platform profiling for Macrobenchmark + Baseline Profile generation
@@ -32,6 +51,16 @@
           also injects its own profileable shim at benchmark-generation time.
         -->
         <profileable android:shell="true" />
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_provider_paths" />
+        </provider>
 
         <activity
             android:name=".MainActivity"

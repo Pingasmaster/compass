@@ -3,27 +3,61 @@ import org.gradle.api.GradleException
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.detekt)
 }
 
 android {
     namespace = "com.compass.app"
     compileSdk = 37
+    buildToolsVersion = "37.0.0"
     // Compile against the 37.1 minor SDK release (API additions only; minor
     // SDKs carry no behavior changes and cannot be targeted - targetSdk
     // stays at the 37 major). Matches calc / dustvalve_next / core.
     compileSdkMinor = 1
 
-    // Shared by defaultConfig + future flavor offset. build.sh bumps this
-    // via sed; future re-reads it on the next Gradle configure.
+    // Shared by defaultConfig + future flavor offset. Local ./build.sh bumps
+    // this via sed; future re-reads it on the next Gradle configure. Push CI
+    // publish injects -Pcompass.versionName=<next patch> so the APK matches
+    // the git tag, and -Pcompass.versionCode=<unix seconds> so PackageManager
+    // upgrades. -Pcompass.ciStamp remains as a fallback unique stamp.
     val baseVersionCode = 46
     val baseVersionName = "1.0.45"
+    val releaseVersionName = (findProperty("compass.versionName") as String?)
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+    val releaseVersionCode = (findProperty("compass.versionCode") as String?)
+        ?.trim()
+        ?.takeIf { it.isNotEmpty() }
+    val ciStamp = (findProperty("compass.ciStamp") as String?)?.trim()?.takeIf { it.isNotEmpty() }
+    val effectiveVersionName = when {
+        releaseVersionName != null -> releaseVersionName
+        ciStamp == null -> baseVersionName
+        else -> "$baseVersionName.$ciStamp"
+    }
+    val effectiveVersionCode = when {
+        releaseVersionCode != null ->
+            releaseVersionCode.toIntOrNull()?.takeIf { it > baseVersionCode }
+                ?: throw GradleException(
+                    "compass.versionCode must be an int greater than baseVersionCode " +
+                        "($baseVersionCode), got '$releaseVersionCode'",
+                )
+
+        ciStamp == null -> baseVersionCode
+
+        else ->
+            ciStamp.toIntOrNull()?.takeIf { it > baseVersionCode }
+                ?: throw GradleException(
+                    "compass.ciStamp must be an int greater than baseVersionCode " +
+                        "($baseVersionCode), got '$ciStamp'",
+                )
+    }
 
     defaultConfig {
         applicationId = "com.compass.app"
         targetSdk = 37
-        versionCode = baseVersionCode
-        versionName = baseVersionName
+        versionCode = effectiveVersionCode
+        versionName = effectiveVersionName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -40,14 +74,29 @@ android {
             dimension = "api"
             minSdk = 26
             versionNameSuffix = "-legacy"
-            // Uses defaultConfig.versionCode so an Android 17 user who
-            // somehow installed compat can still upgrade to future.
+            // Uses defaultConfig.versionCode (below future) so an Android 17
+            // user who somehow installed compat can still upgrade to future.
+            // Fat APK: 32-bit (armeabi-v7a, x86) plus the three 64-bit ABIs.
+            ndk {
+                abiFilters += listOf(
+                    "armeabi-v7a",
+                    "arm64-v8a",
+                    "x86",
+                    "x86_64",
+                    "riscv64",
+                )
+            }
         }
         create("future") {
             dimension = "api"
             minSdk = 37
             // Higher than compat so sideload/Play prefer this on API 37+.
-            versionCode = 1_000_000 + baseVersionCode
+            versionCode = 1_000_000 + effectiveVersionCode
+            // Fat APK: 64-bit only. Android 17 devices are 64-bit; 32-bit
+            // ABIs would never install and would only inflate the download.
+            ndk {
+                abiFilters += listOf("arm64-v8a", "x86_64", "riscv64")
+            }
         }
     }
 
@@ -69,17 +118,32 @@ android {
             } else if (requireReleaseSigning) {
                 throw GradleException(
                     "release-keystore.jks or .password-signing-keys missing, but " +
-                        "compass.requireReleaseSigning=true (set by ./build.sh " +
-                        "release path). Refusing to sign release artifacts with " +
-                        "the debug key. Place both files at the repo root, or use " +
-                        "./build.sh --debug for a local unsigned-of-production build.",
+                        "compass.requireReleaseSigning=true. Refusing to sign " +
+                        "release artifacts with the debug key. Place both files at " +
+                        "the repo root, or omit the property for a local " +
+                        "debug-signed release assemble.",
                 )
             } else {
+                // Fallback keeps :app:assembleRelease unblocked for CI
+                // and local builds without secrets. The resulting APK is
+                // debug-signed and NOT shippable.
+                val wantsReleaseArtifact = gradle.startParameter.taskNames.any { name ->
+                    val task = name.substringAfterLast(':')
+                    task.contains("Release") &&
+                        (task.startsWith("assemble") || task.startsWith("bundle") || task.startsWith("install"))
+                }
                 val fallbackMessage = "release-keystore.jks or .password-signing-keys missing - " +
                     "falling back to AGP debug signing for the release variant " +
-                    "(ok for --debug / local; production builds must set " +
-                    "compass.requireReleaseSigning=true)."
-                rootProject.logger.warn(fallbackMessage)
+                    "(ok for CI / local; production efreihub-release assemble " +
+                    "must pass -Pcompass.requireReleaseSigning=true)."
+                // lifecycle (not warn): local/dev builds without the production
+                // keystore are expected; a WARNING line fails Gradle
+                // warning-as-error even though the fallback is intentional.
+                if (wantsReleaseArtifact) {
+                    rootProject.logger.lifecycle(fallbackMessage)
+                } else {
+                    rootProject.logger.info(fallbackMessage)
+                }
                 val debug = signingConfigs.getByName("debug")
                 val debugStoreFile = debug.storeFile
                 if (debugStoreFile != null && !debugStoreFile.exists()) {
@@ -163,7 +227,7 @@ android {
 
     buildFeatures {
         compose = true
-        buildConfig = false
+        buildConfig = true
     }
 
     lint {
@@ -177,6 +241,7 @@ android {
     }
 
     testOptions {
+        unitTests.isReturnDefaultValues = true
         managedDevices {
             localDevices {
                 register("pixel7aApi37") {
@@ -244,12 +309,15 @@ dependencies {
     implementation(libs.material3.adaptive)
 
     implementation(libs.activity.compose)
+    implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.lifecycle.viewmodel.compose)
     implementation(libs.lifecycle.runtime.compose)
 
     implementation(libs.datastore.preferences)
     implementation(libs.coroutines.android)
+    implementation(libs.okhttp)
+    implementation(libs.kotlinx.serialization.json)
 
     // Profile installer is what ships the baseline + startup profiles baked into the
     // release APK. At install / first launch it copies the profiles from the APK
@@ -258,6 +326,10 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)
+    testImplementation(libs.okhttp.mockwebserver)
+    testImplementation(libs.truth)
+    testImplementation(libs.mockk)
+    testImplementation(libs.turbine)
 
     androidTestImplementation(libs.junit)
     androidTestImplementation(libs.androidx.test.ext.junit)
