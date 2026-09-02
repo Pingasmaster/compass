@@ -27,7 +27,7 @@ on: push
 
 jobs:
   ci:
-    runs-on: self-hosted
+    runs-on: alpine
     concurrency:
       group: ci
       cancel-in-progress: true
