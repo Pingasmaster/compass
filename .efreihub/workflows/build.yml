@@ -10,9 +10,9 @@
 # assemble, next patch git tag, efreihub release, and two fat APKs
 # (compat + future). Publish is skipped when EFREIHUB_TOKEN is unset.
 #
-# Operator runner flags this Android job needs (CLI, not workflow YAML):
-#   --sandbox-share-net              Maven/Google downloads (default bwrap has no net)
-#   --sandbox-host-tools             plus JDK 26 under /usr and ANDROID_HOME bind
+# Guest image (`jobs.ci.guest`) is baked once (JDK 26 + Android SDK) and
+# booted read-only for every run. Operator runner flags still needed:
+#   --sandbox-share-net              Maven/Google + first image bake
 #   --sandbox-efreihub-token-file    write PAT (ehp_...) injected as EFREIHUB_TOKEN
 #   --sandbox-efreihub-token-repo    admin/compass
 # Signing: bind release-keystore.jks + .password-signing-keys at
@@ -31,6 +31,17 @@ jobs:
     concurrency:
       group: ci
       cancel-in-progress: true
+    guest:
+      packages:
+        - bash
+        - unzip
+        - tar
+        - coreutils
+        - gcompat
+        - libstdc++
+        - which
+      jdk: "26"
+      android-sdk: true
     steps:
       - uses: actions/checkout@v4
 
