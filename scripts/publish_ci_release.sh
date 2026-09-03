@@ -35,6 +35,26 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT_DIR"
 
+# Firecracker rootfs is read-only; guest HOME defaults to /root.
+# Publish is a separate step and does not inherit ci.sh exports.
+# Prefer /work (Firecracker work disk). Host-side signing-gate dry runs may
+# lack it; fall back under /tmp so fail-closed checks still run without
+# letting guest HOME=/root win in the guest.
+if [ -d /work ] && [ -w /work ]; then
+  export HOME=/work/.efreihub-home
+  export GRADLE_USER_HOME="${GRADLE_USER_HOME:-/work/.gradle}"
+  export TMPDIR="${TMPDIR:-/work/tmp}"
+else
+  _efreihub_pub_fallback="${TMPDIR:-/tmp}/efreihub-publish-home"
+  export HOME="${_efreihub_pub_fallback}/home"
+  export GRADLE_USER_HOME="${_efreihub_pub_fallback}/gradle"
+  export TMPDIR="${_efreihub_pub_fallback}/tmp"
+fi
+mkdir -p "$HOME" "$GRADLE_USER_HOME" "$TMPDIR"
+export ANDROID_USER_HOME="${ANDROID_USER_HOME:-$HOME/.android}"
+mkdir -p "$ANDROID_USER_HOME"
+export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:+$JAVA_TOOL_OPTIONS }--sun-misc-unsafe-memory-access=allow --enable-native-access=ALL-UNNAMED -Duser.home=${HOME}"
+
 REF="${EFREIHUB_REF:-}"
 DEFAULT_BRANCH_REF="${EFREIHUB_DEFAULT_BRANCH_REF:-refs/heads/master}"
 

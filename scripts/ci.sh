@@ -22,7 +22,7 @@
 set -euo pipefail
 
 # Firecracker rootfs is read-only. Keep Gradle/JDK state on the work disk.
-export HOME="${HOME:-/work/.efreihub-home}"
+export HOME=/work/.efreihub-home
 export GRADLE_USER_HOME="${GRADLE_USER_HOME:-/work/.gradle}"
 mkdir -p "$HOME" "$GRADLE_USER_HOME"
 # AGP aapt2 (Gradle cache, glibc) segfaults on musl libgcc_s. GNU libgcc_s
