@@ -23,4 +23,47 @@
     <issue id="UnrememberedMutableState"      severity="error" />
     <issue id="ModifierParameter"             severity="error" />
     <issue id="ComposeUnstableCollections"    severity="informational" />
+
+    <!--
+        NewerVersionAvailable / AndroidGradlePluginVersion report that some
+        dependency in gradle/libs.versions.toml has a newer release. The
+        project tracks upgrades via routine dependency review, not via lint.
+        With warningsAsErrors = true these would otherwise fail lintRelease.
+        Demote to informational so they stay visible in editor lint markers
+        without blocking CI.
+    -->
+    <issue id="NewerVersionAvailable"         severity="informational" />
+    <issue id="AndroidGradlePluginVersion"    severity="informational" />
+    <issue id="GradleDependency"              severity="informational" />
+
+    <!--
+        slack-lints AvoidUsingNotNullOperator flags every `!!`. Tests use
+        checkNotNull / requireNotNull; keep the test ignore to match calc/core.
+    -->
+    <issue id="AvoidUsingNotNullOperator">
+        <ignore path="**/src/test/**" />
+        <ignore path="**/src/androidTest/**" />
+    </issue>
+
+    <!--
+        slack-lints DenyListedApi forbids runCatching because it swallows
+        CancellationException. In tests, runCatching{}.exceptionOrNull() is
+        the assertion idiom. Match calc/core.
+    -->
+    <issue id="DenyListedApi">
+        <ignore path="**/src/test/**" />
+        <ignore path="**/src/androidTest/**" />
+    </issue>
+
+    <!--
+        slack-lints RawDispatchersUse wants injected dispatchers. Compass is
+        not Hilt-wired; Application constructs the updater with Dispatchers.IO.
+        Match calc CalculatorApplication.kt ignore.
+    -->
+    <issue id="RawDispatchersUse">
+        <ignore path="**/CompassApplication.kt" />
+    </issue>
+
+    <!-- Sideload ARM APKs only. ChromeOS x86 is a store-distribution concern. -->
+    <issue id="ChromeOsAbiSupport"            severity="ignore" />
 </lint>
