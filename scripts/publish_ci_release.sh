@@ -55,7 +55,7 @@ export ANDROID_USER_HOME="${ANDROID_USER_HOME:-$HOME/.android}"
 mkdir -p "$ANDROID_USER_HOME"
 export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:+$JAVA_TOOL_OPTIONS }--sun-misc-unsafe-memory-access=allow --enable-native-access=ALL-UNNAMED -Duser.home=${HOME}"
 
-# AGP aapt2 is glibc; Alpine musl libgcc_s makes it SIGSEGV. ci.sh exports
+# AGP aapt2 is glibc; Alpine musl libgcc_s makes it SIGSEGV in the publish guest. ci.sh exports
 # this; publish is a separate Firecracker guest and does not inherit it.
 if [ -d /usr/glibc-compat/lib ]; then
   export LD_LIBRARY_PATH="/usr/glibc-compat/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
