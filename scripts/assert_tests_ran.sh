@@ -1,20 +1,32 @@
 #!/usr/bin/env bash
 # Guards against silently-green 0-test runs: a GMD invocation whose
-# instrumentation matches nothing (wrong annotation filter, renamed test
-# classes, runner mismatch) exits 0 with 'Starting 0 tests'. Parse the JUnit
-# XML, print the executed count, and fail ./build.sh when nothing ran.
-# Usage: assert_tests_ran.sh <min-tests> [gradle-module-dir]
-# The module dir defaults to "app"; pass e.g. "shippedsmoke" for lanes whose
-# instrumentation lives in another module.
+# instrumentation matches nothing exits 0 with 'Starting 0 tests', and a
+# Gradle unit-test filter/config typo can just as silently run zero JVM
+# tests. Parse the JUnit XML, print the executed count, and fail when
+# nothing ran.
+#
+# Usage: assert_tests_ran.sh <min-tests> [gradle-module-dir] [kind]
+#   kind is "androidTest" (default, GMD / connected) or "unit"
+#     (JVM unit tests under build/test-results).
+# The module dir defaults to "app"; pass e.g. "shippedsmoke" for lanes
+# whose instrumentation lives in another module.
 set -u
 MIN="${1:-1}"
 export RESULTS_ROOT="${2:-app}"
+export RESULTS_KIND="${3:-androidTest}"
 
 count=$(python3 - <<'PY'
 import glob, os, xml.etree.ElementTree as ET
 root_dir = os.environ.get('RESULTS_ROOT', 'app')
+kind = os.environ.get('RESULTS_KIND', 'androidTest')
+if kind == 'unit':
+    patterns = (f'{root_dir}/**/build/test-results/**/*.xml',)
+elif kind == 'androidTest':
+    patterns = (f'{root_dir}/**/build/outputs/androidTest-results/**/*.xml',)
+else:
+    raise SystemExit(f'unknown RESULTS_KIND={kind!r}')
 total = 0
-for f in glob.glob(f'{root_dir}/build/outputs/androidTest-results/**/*.xml', recursive=True):
+for f in sorted(set(p for pat in patterns for p in glob.glob(pat, recursive=True))):
     try:
         root = ET.parse(f).getroot()
     except Exception:
@@ -24,18 +36,20 @@ print(total)
 PY
 )
 
-echo "executed-test-count: ${count} instrumentation tests ran in this job"
+echo "executed-test-count: ${count} ${RESULTS_KIND} tests ran under ${RESULTS_ROOT} in this job"
 if [ "${count}" -lt "${MIN}" ]; then
   echo "ERROR: Only ${count} tests ran (expected >= ${MIN}) - the filter or runner matched nothing; treating as failure."
-  # Ground truth: dump what the runner actually reported (suite attributes
-  # plus any instrumentation output embedded in the XML) so the cause is
-  # diagnosable from public annotations alone.
   python3 - <<'PY'
 import glob, os, xml.etree.ElementTree as ET
 root_dir = os.environ.get('RESULTS_ROOT', 'app')
-files = sorted(glob.glob(f'{root_dir}/build/outputs/androidTest-results/**/*.xml', recursive=True))
+kind = os.environ.get('RESULTS_KIND', 'androidTest')
+if kind == 'unit':
+    patterns = (f'{root_dir}/**/build/test-results/**/*.xml',)
+else:
+    patterns = (f'{root_dir}/**/build/outputs/androidTest-results/**/*.xml',)
+files = sorted(set(p for pat in patterns for p in glob.glob(pat, recursive=True)))
 if not files:
-    print("ERROR: No JUnit XML found at all under androidTest-results")
+    print(f"ERROR: No JUnit XML found at all under {kind} results")
 for f in files[:4]:
     try:
         root = ET.parse(f).getroot()
@@ -53,15 +67,14 @@ for f in files[:4]:
     text = '%0A'.join(b.replace('%', '%25').replace('\n', ' ') for b in bits)[:3800]
     print(f"ERROR: {text}")
 PY
-  # The instrumentation stream (am instrument -r output: INSTRUMENTATION_
-  # STATUS lines, runner/scanner errors) lives in UTP's logs, not the XML.
-  # Surface the most interesting tails as annotations too.
   python3 - <<'PY'
-import glob, os
+import glob, os, re
+root_dir = os.environ.get('RESULTS_ROOT', 'app')
 roots = [
-    'app/build/outputs/androidTest-results',
-    'app/build/intermediates/managed_device_android_test_additional_output',
-    'app/build/intermediates/utp',
+    f'{root_dir}/build/outputs/androidTest-results',
+    f'{root_dir}/build/intermediates/managed_device_android_test_additional_output',
+    f'{root_dir}/build/intermediates/utp',
+    f'{root_dir}/build/test-results',
 ]
 files = []
 for r in roots:
@@ -70,13 +83,11 @@ for r in roots:
 files = sorted(set(files), key=os.path.getsize, reverse=True)
 listing = ' | '.join(f"{f}({os.path.getsize(f)}B)" for f in files[:15]) or 'no log/txt files found'
 print(f"ERROR: {listing[:3800]}")
-import re
 for f in files[:3]:
     try:
         data = open(f, encoding='utf-8', errors='replace').read()
     except Exception:
         continue
-    # Prefer instrumentation/runner lines; fall back to the tail.
     lines = [l for l in data.splitlines() if re.search(
         r'INSTRUMENTATION|numtests|TestRequestBuilder|TestLoader|ClassPathScanner|Exception|Error|error', l)]
     if not lines:

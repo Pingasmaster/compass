@@ -21,9 +21,21 @@ Pure efreihub CI: `.efreihub/workflows/build.yml` runs `scripts/ci.sh` then
 `scripts/publish_ci_release.sh`. No GitHub Actions. `build.sh` is the local
 entrypoint only (deps bump, version bump, APK copy/serve). CI does not bump
 the catalog or committed version; publish injects `-Pcompass.versionName` and
-`-Pcompass.versionCode`. Repo is `admin/compass`. Signing files at
-`/usr/local/compass-signing` or the repo root. Fat APKs:
+`-Pcompass.versionCode`. Repo is `admin/compass`. Fat APKs:
 `app-release.apk` (compat) and `app-release-future.apk` (future).
+
+Signing files (`release-keystore.jks` + `.password-signing-keys`) are
+native efreihub file secrets (`COMPASS_RELEASE_KEYSTORE` /
+`COMPASS_RELEASE_PASSWORD`), materialized at the repo root, only on
+default-branch (master) job runs; `EFREIHUB_TOKEN` is likewise a
+native env secret, default-branch only. All three are write-only in
+the efreihub secret store. `/usr/local/compass-signing` is a
+secondary, manual fallback path (local testing / non-native runner),
+not the expected efreihub path. `scripts/ci.sh`'s release
+lint/assemble always passes `-Pcompass.requireReleaseSigning=true`
+(no debug-signed release fallback from CI); `scripts/publish_ci_release.sh`
+fails the build (does not skip) if a default-branch run is missing the
+token or a signing file. See `docs/ci.md` and `docs/release-keys.md`.
 
 ## Local pipeline
 

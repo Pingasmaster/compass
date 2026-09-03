@@ -9,10 +9,25 @@
 # Production assemble must pass -Pcompass.requireReleaseSigning=true so a
 # missing keystore cannot silently fall back to debug signing.
 #
-# Skip (exit 0) when EFREIHUB_TOKEN is unset so push CI stays green until the
-# colocated runner injects a write PAT (--sandbox-efreihub-token-file +
-# --sandbox-efreihub-token-repo admin/compass). Skip tag refs so creating
-# the release tag cannot loop another publish.
+# efreihub injects three secrets natively at the repo root, and ONLY on
+# default-branch (master) job runs (see docs/release-keys.md):
+#   EFREIHUB_TOKEN               env secret; write PAT for release
+#                                 create/upload.
+#   COMPASS_RELEASE_KEYSTORE     file secret materialized as
+#                                 release-keystore.jks.
+#   COMPASS_RELEASE_PASSWORD     file secret materialized as
+#                                 .password-signing-keys.
+# All three are write-only in the efreihub secret store: this script
+# can consume them but can never read their values back out of the
+# platform.
+#
+# CI honesty: on a default-branch push, a missing token or a missing
+# signing file is a misconfiguration, not something to shrug off, so
+# this script fails nonzero (does NOT skip) in that case. It skips
+# (exit 0) only for:
+#   - a tag ref, so creating the release tag cannot loop another publish
+#   - a push to a non-default branch, where efreihub does not inject
+#     these secrets at all, so there is nothing to publish from
 #
 set -euo pipefail
 
@@ -21,16 +36,27 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT_DIR"
 
 REF="${EFREIHUB_REF:-}"
+DEFAULT_BRANCH_REF="${EFREIHUB_DEFAULT_BRANCH_REF:-refs/heads/master}"
+
 case "$REF" in
     refs/tags/*)
-        echo "publish_ci_release: skip (ref is a tag: $REF)"
+        echo "publish_ci_release: skip (ref is a tag: $REF; avoids a tag-triggered publish loop)"
         exit 0
         ;;
 esac
 
-if [[ -z "${EFREIHUB_TOKEN:-}" ]]; then
-    echo "publish_ci_release: skip (EFREIHUB_TOKEN unset; runner needs --sandbox-efreihub-token-file and --sandbox-efreihub-token-repo admin/compass)"
+if [[ -n "$REF" && "$REF" != "$DEFAULT_BRANCH_REF" ]]; then
+    echo "publish_ci_release: skip (ref $REF is not the default branch $DEFAULT_BRANCH_REF; efreihub only injects EFREIHUB_TOKEN/signing secrets on default-branch job runs)"
     exit 0
+fi
+
+# REF is either the default branch, or empty/unset (e.g. a manual run
+# outside the efreihub job). Either way this is treated as a
+# default-branch run: secrets are expected, and a missing one below is
+# a hard failure, not a silent skip.
+if [[ -z "${EFREIHUB_TOKEN:-}" ]]; then
+    echo "ERROR: EFREIHUB_TOKEN is unset on a default-branch run (ref: ${REF:-unset}). efreihub injects this natively for default-branch jobs; a missing token here is a misconfiguration, not an expected skip." >&2
+    exit 1
 fi
 
 API_BASE="${EFREIHUB_API_URL:-https://efrei.app:50002/hub/api/v1}"
@@ -43,6 +69,12 @@ if [[ "$OWNER" == "$REPO_SLUG" || -z "$REPO" || "$REPO" == *"/"* ]]; then
     exit 1
 fi
 
+# Primary path: efreihub's native file secrets (COMPASS_RELEASE_KEYSTORE,
+# COMPASS_RELEASE_PASSWORD) are already materialized at the repo root as
+# release-keystore.jks / .password-signing-keys by the time this script
+# runs. SIGNING_DIR is a secondary/manual fallback (a bind-mounted or
+# operator-provisioned signing dir) kept for local testing and non-native
+# runner setups; it is not the expected path on efreihub itself anymore.
 SIGNING_DIR="${COMPASS_SIGNING_DIR:-/usr/local/compass-signing}"
 if [[ ! -f "$ROOT_DIR/release-keystore.jks" && -f "$SIGNING_DIR/release-keystore.jks" ]]; then
     cp "$SIGNING_DIR/release-keystore.jks" "$ROOT_DIR/release-keystore.jks"
@@ -51,8 +83,8 @@ if [[ ! -f "$ROOT_DIR/.password-signing-keys" && -f "$SIGNING_DIR/.password-sign
     cp "$SIGNING_DIR/.password-signing-keys" "$ROOT_DIR/.password-signing-keys"
 fi
 if [[ ! -f "$ROOT_DIR/release-keystore.jks" || ! -f "$ROOT_DIR/.password-signing-keys" ]]; then
-    echo "publish_ci_release: skip (keystore not bound at $SIGNING_DIR or repo root; push CI stays green)"
-    exit 0
+    echo "ERROR: release-keystore.jks / .password-signing-keys missing at repo root (and not bound at $SIGNING_DIR) on a default-branch run. efreihub injects these natively as the COMPASS_RELEASE_KEYSTORE / COMPASS_RELEASE_PASSWORD file secrets; a missing file here is a misconfiguration, not an expected skip." >&2
+    exit 1
 fi
 
 BASE_VERSION_NAME="$(sed -n 's/^[[:space:]]*val baseVersionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -n 1)"

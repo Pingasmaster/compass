@@ -1,16 +1,23 @@
 #!/usr/bin/env bash
 #
 # efreihub push gates: debug lints/tests + debug APKs, release lint/assemble
-# (without -Pcompass.requireReleaseSigning), ELF 16k check, and (when
-# /dev/kvm exists) shippedsmoke + smoke + hermetic e2e. Dedicated CI
-# runner: no catalog rewrite, no committed version bump, no APK copy/serve.
-# Tag + fat APK publish is a later workflow step
-# (`scripts/publish_ci_release.sh`).
+# WITH -Pcompass.requireReleaseSigning=true (no debug-signed release
+# fallback), ELF 16k check, and (when /dev/kvm exists) shippedsmoke +
+# smoke + hermetic e2e. Dedicated CI runner: no catalog rewrite, no
+# committed version bump, no APK copy/serve. Tag + fat APK publish is a
+# later workflow step (`scripts/publish_ci_release.sh`).
 #
-# Production efreihub-release assemble must pass
-# -Pcompass.requireReleaseSigning=true
-# so a missing keystore cannot silently fall back to debug signing.
-# CI does not pass that property: the keystore is gitignored on the forge.
+# Production release assemble must pass
+# -Pcompass.requireReleaseSigning=true so a missing keystore cannot
+# silently fall back to debug signing. efreihub injects the two
+# release-signing file secrets (COMPASS_RELEASE_KEYSTORE ->
+# release-keystore.jks, COMPASS_RELEASE_PASSWORD ->
+# .password-signing-keys) natively at the repo root on default-branch
+# job runs (see docs/release-keys.md), so this script always arms
+# requireReleaseSigning=true for the release gate below: there is no
+# debug-signed "release" fallback from CI. A push without those
+# secrets (e.g. a non-default branch) is expected to fail this gate,
+# not silently pass with an unshippable APK.
 #
 set -euo pipefail
 
@@ -97,6 +104,15 @@ GRADLE_TASKS=(
     :shippedsmoke:assembleFutureRelease
     assembleCompatRelease
     assembleFutureRelease
+)
+# Armed unconditionally on the release gate below: efreihub's native
+# file secrets put a real keystore + password at the repo root on
+# default-branch job runs, so the release build must prove it can
+# really sign, not fall back to the AGP debug key. See
+# app/build.gradle.kts signingConfigs.create("release") for the
+# Gradle-side hard-fail when the files are missing.
+RELEASE_SIGNING_PROPS=(
+    -Pcompass.requireReleaseSigning=true
 )
 
 GRADLE_APK_COMPAT="app/build/outputs/apk/compat/release/app-compat-release.apk"
@@ -194,12 +210,19 @@ chmod +x ./scripts/run_gradle.sh
 
 echo "Running debug lints and tests..."
 gradle "${DEBUG_GATE_TASKS[@]}"
+
+# lint/detekt/ktlint do not write JUnit XML; only the unit-test tasks
+# above do. A Gradle filter/config typo can make those match zero
+# classes and still exit 0, so count actual <testcase> elements
+# before trusting the green gradle() call above.
+echo "Verifying unit tests actually ran..."
+./scripts/assert_tests_ran.sh 1 app unit
+
 echo "Assembling debug APKs..."
 gradle "${DEBUG_ASSEMBLE_TASKS[@]}"
 
-# Keystore is gitignored; do not arm requireReleaseSigning on the forge.
-echo "Running release lint and assemble..."
-gradle "${GRADLE_TASKS[@]}"
+echo "Running release lint and assemble (requireReleaseSigning=true)..."
+gradle "${RELEASE_SIGNING_PROPS[@]}" "${GRADLE_TASKS[@]}"
 
 ./scripts/check_elf_16k_alignment.sh "$GRADLE_APK_COMPAT" "$GRADLE_APK_FUTURE"
 
