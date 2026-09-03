@@ -25,7 +25,7 @@ resolve_real_jdk() {
         && -x "${JAVA_HOME}/bin/java" \
         && "${JAVA_HOME}" != "${WRAPPER_ROOT}" ]]; then
         ver="$("${JAVA_HOME}/bin/java" -version 2>&1 | head -1 || true)"
-        if [[ "$ver" == *'"26'* || "$ver" == *' 26.'* ]]; then
+        if [[ "$ver" == *'"27'* || "$ver" == *' 27.'* || "$ver" == *'"26'* || "$ver" == *' 26.'* ]]; then
             echo "$JAVA_HOME"
             return
         fi
@@ -33,6 +33,10 @@ resolve_real_jdk() {
     local candidate ver
     # Arch: extra/jdk-openjdk -> java-26-openjdk (and /usr/lib/jvm/default).
     for candidate in \
+        /usr/lib/jvm/java-27-openjdk \
+        /usr/lib/jvm/java-27-openjdk-amd64 \
+        /usr/lib/jvm/temurin-27-jdk-amd64 \
+        "$HOME/.jdks/jdk-27" \
         /usr/lib/jvm/java-26-openjdk \
         /usr/lib/jvm/default \
         /usr/lib/jvm/java-26-openjdk-amd64 \
@@ -40,13 +44,13 @@ resolve_real_jdk() {
         "$HOME/.jdks/jdk-26"; do
         if [[ -x "$candidate/bin/java" ]]; then
             ver="$("$candidate/bin/java" -version 2>&1 | head -1 || true)"
-            if [[ "$ver" == *'"26'* || "$ver" == *' 26.'* ]]; then
+            if [[ "$ver" == *'"27'* || "$ver" == *' 27.'* || "$ver" == *'"26'* || "$ver" == *' 26.'* ]]; then
                 echo "$candidate"
                 return
             fi
         fi
     done
-    echo "ensure-jdk26-home: no JDK 26 installation found" >&2
+    echo "ensure-jdk26-home: no JDK 27/26 installation found" >&2
     return 1
 }
 

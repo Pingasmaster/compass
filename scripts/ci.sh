@@ -14,15 +14,25 @@
 #
 set -euo pipefail
 
+# Firecracker rootfs is read-only. Keep Gradle/JDK state on the work disk.
+export HOME="${HOME:-/work/.efreihub-home}"
+export GRADLE_USER_HOME="${GRADLE_USER_HOME:-/work/.gradle}"
+mkdir -p "$HOME" "$GRADLE_USER_HOME"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT_DIR"
 
-# Prefer a real JDK 26, then wrap it so Gradle Worker Daemons (ktlint) also
-# get the JEP 498 / JEP 472 opt-in flags.
+# Prefer a real JDK 27 (Firecracker guest Temurin 27 EA), then JDK 26.
+# Wrap it so Gradle Worker Daemons also get the JEP 498 / JEP 472 opt-in flags.
+# ensure-jdk26-home.sh is a JEP-flag wrapper; keep sourcing it when JAVA_HOME is 27.
 if [[ -z "${JAVA_HOME:-}" || "${JAVA_HOME}" == "${ROOT_DIR}/.jdk26-home" ]]; then
     unset JAVA_HOME
     for candidate in \
+        /usr/lib/jvm/java-27-openjdk \
+        /usr/lib/jvm/java-27-openjdk-amd64 \
+        /usr/lib/jvm/temurin-27-jdk-amd64 \
+        "${HOME}/.jdks/jdk-27" \
         /usr/lib/jvm/java-26-openjdk \
         /usr/lib/jvm/default \
         /usr/lib/jvm/java-26-openjdk-amd64 \
@@ -30,17 +40,35 @@ if [[ -z "${JAVA_HOME:-}" || "${JAVA_HOME}" == "${ROOT_DIR}/.jdk26-home" ]]; the
         "${HOME}/.jdks/jdk-26"; do
         if [[ -x "${candidate}/bin/java" ]]; then
             ver="$("${candidate}/bin/java" -version 2>&1 | head -1 || true)"
-            if [[ "$ver" == *'"26'* || "$ver" == *' 26.'* ]]; then
+            if [[ "$ver" == *'"27'* || "$ver" == *' 27.'* ]]; then
                 export JAVA_HOME="$candidate"
                 break
             fi
         fi
     done
+    if [[ -z "${JAVA_HOME:-}" ]]; then
+        for candidate in \
+            /usr/lib/jvm/java-26-openjdk \
+            /usr/lib/jvm/default \
+            /usr/lib/jvm/java-26-openjdk-amd64 \
+            /usr/lib/jvm/temurin-26-jdk-amd64 \
+            "${HOME}/.jdks/jdk-26"; do
+            if [[ -x "${candidate}/bin/java" ]]; then
+                ver="$("${candidate}/bin/java" -version 2>&1 | head -1 || true)"
+                if [[ "$ver" == *'"26'* || "$ver" == *' 26.'* ]]; then
+                    export JAVA_HOME="$candidate"
+                    break
+                fi
+            fi
+        done
+    fi
 fi
 # shellcheck source=scripts/ensure-jdk26-home.sh
 source "$ROOT_DIR/scripts/ensure-jdk26-home.sh"
 
-export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:+$JAVA_TOOL_OPTIONS }--sun-misc-unsafe-memory-access=allow --enable-native-access=ALL-UNNAMED"
+export ANDROID_USER_HOME="${ANDROID_USER_HOME:-$HOME/.android}"
+mkdir -p "$ANDROID_USER_HOME"
+export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:+$JAVA_TOOL_OPTIONS }--sun-misc-unsafe-memory-access=allow --enable-native-access=ALL-UNNAMED -Duser.home=${HOME}"
 
 SMOKE_ANNOTATION="com.compass.app.testing.SmokeTest"
 SMOKE_ASSERT_COUNT=1

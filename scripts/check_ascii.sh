@@ -9,6 +9,8 @@
 #   scripts/check_ascii.sh          # exit 1 if violations found (CI mode)
 #   scripts/check_ascii.sh --warn   # print warnings only, always exit 0
 set -euo pipefail
+# Firecracker busybox has no /dev/fd (bash process substitution).
+[ -e /dev/fd ] || ln -sfn /proc/self/fd /dev/fd 2>/dev/null || true
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 

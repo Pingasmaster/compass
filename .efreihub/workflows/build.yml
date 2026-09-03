@@ -1,7 +1,6 @@
-# Forge-native CI on every push. The colocated runner executes `run:` steps
-# inside bubblewrap (not Docker): unshared namespaces, cap-drop ALL, no
-# docker.sock. `actions/checkout` is skipped (tree exported without `.git`).
-# Other `uses:` fail closed.
+# Forge-native CI on every push. Untrusted `run:` steps boot a Firecracker
+# microVM (not Docker, not the Alpine host). `actions/checkout` is skipped
+# (tree exported without `.git`). Other `uses:` fail closed.
 #
 # This job runs ./scripts/ci.sh: debug lints/tests/APKs, release
 # lint/assemble (without -Pcompass.requireReleaseSigning), ELF check,
@@ -10,14 +9,13 @@
 # assemble, next patch git tag, efreihub release, and two fat APKs
 # (compat + future). Publish is skipped when EFREIHUB_TOKEN is unset.
 #
-# Guest image (`jobs.ci.guest`) is baked once (JDK 26 + Android SDK) and
+# Guest image (`jobs.ci.guest`) is baked once (GNU libc Temurin 27 EA + Android SDK) and
 # booted read-only for every run. Operator runner flags still needed:
 #   --sandbox-share-net              Maven/Google + first image bake
 #   --sandbox-efreihub-token-file    write PAT (ehp_...) injected as EFREIHUB_TOKEN
 #   --sandbox-efreihub-token-repo    admin/compass
-# Signing: bind release-keystore.jks + .password-signing-keys at
-# /usr/local/compass-signing (read-only /usr) or the job workdir.
-# GMD needs /dev/kvm in the jail; without it CI skips device gates.
+# Signing: keystore files in the job workdir (or a path the guest can read).
+# GMD needs /dev/kvm in the guest; without it CI skips device gates.
 #
 # concurrency.group is a constant so a newer push cancels the in-flight job
 # from the previous push (any branch).
@@ -40,8 +38,10 @@ jobs:
         - gcompat
         - libstdc++
         - which
-      jdk: "26"
+      jdk: "27"
       android-sdk: true
+      cpus: all
+      memory: 24Gi
     steps:
       - uses: actions/checkout@v4
 

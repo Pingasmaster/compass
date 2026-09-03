@@ -1,7 +1,7 @@
 [versions]
-agp = "9.5.0-alpha01"
+agp = "9.5.0-alpha03"
 desugar-jdk-libs = "2.1.5"
-kotlin-compose = "2.4.20-RC"
+kotlin-compose = "2.4.20-RC3"
 leakcanary = "3.0-alpha-9"
 
 # The Compose BOM pins every androidx.compose.* artefact. The explicit
