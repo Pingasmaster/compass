@@ -18,6 +18,12 @@ set -euo pipefail
 export HOME="${HOME:-/work/.efreihub-home}"
 export GRADLE_USER_HOME="${GRADLE_USER_HOME:-/work/.gradle}"
 mkdir -p "$HOME" "$GRADLE_USER_HOME"
+# AGP aapt2 (Gradle cache, glibc) segfaults on musl libgcc_s. GNU libgcc_s
+# lives in the guest glibc prefix.
+if [ -d /usr/glibc-compat/lib ]; then
+  export LD_LIBRARY_PATH="/usr/glibc-compat/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+  echo "CI: exported LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
