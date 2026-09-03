@@ -52,7 +52,8 @@ class AppUpdateServiceTest {
 
         val update = svc.checkForUpdate()
         assertThat(update).isNotNull()
-        assertThat(update!!.versionName).isEqualTo("0.3.50")
+        checkNotNull(update)
+        assertThat(update.versionName).isEqualTo("0.3.50")
         assertThat(update.apkDownloadUrl).endsWith(AppUpdateService.selectedApkAsset())
     }
 
@@ -524,7 +525,8 @@ class AppUpdateServiceTest {
         val svc = testService(installed = "0.1.0")
         val update = svc.checkForUpdate()
         assertThat(update).isNotNull()
-        assertThat(update!!.apkDownloadUrl)
+        checkNotNull(update)
+        assertThat(update.apkDownloadUrl)
             .isEqualTo("https://efrei.app:50002/hub/admin/compass/releases/assets/$assetId")
     }
 
@@ -641,7 +643,8 @@ class AppUpdateServiceTest {
         )
         val ex = runCatching { svc.launchInstaller() }.exceptionOrNull()
         assertThat(ex).isInstanceOf(IOException::class.java)
-        assertThat(ex!!.message).contains("signing")
+        checkNotNull(ex)
+        assertThat(ex.message).contains("signing")
         assertThat(apk.exists()).isFalse()
     }
 
@@ -657,7 +660,8 @@ class AppUpdateServiceTest {
         )
         val ex = runCatching { svc.launchInstaller() }.exceptionOrNull()
         assertThat(ex).isInstanceOf(IOException::class.java)
-        assertThat(ex!!.message).contains("cannot read installed")
+        checkNotNull(ex)
+        assertThat(ex.message).contains("cannot read installed")
     }
 
     @Test fun `launchInstaller refuses when apk signing digests are empty`() {
@@ -672,7 +676,8 @@ class AppUpdateServiceTest {
         )
         val ex = runCatching { svc.launchInstaller() }.exceptionOrNull()
         assertThat(ex).isInstanceOf(IOException::class.java)
-        assertThat(ex!!.message).contains("cannot read downloaded")
+        checkNotNull(ex)
+        assertThat(ex.message).contains("cannot read downloaded")
         assertThat(apk.exists()).isTrue()
     }
 
