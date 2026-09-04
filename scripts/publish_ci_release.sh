@@ -1,33 +1,21 @@
 #!/usr/bin/env bash
 #
 # After a green ./scripts/ci.sh, create a git tag + efreihub release and
-# upload two signed fat APKs: compat (armeabi-v7a + arm64-v8a + x86 +
-# x86_64 + riscv64) as app-release.apk, future (arm64-v8a + x86_64 +
-# riscv64) as app-release-future.apk. The in-app updater lists
-# https://efrei.app:50002/hub/api/v1/repos/admin/compass/releases.
+# upload the already-compiled signed fat APKs that ci.sh staged under
+# /work/compass-ci-release:
+#   compat (armeabi-v7a + arm64-v8a + x86 + x86_64 + riscv64) as app-release.apk
+#   future (arm64-v8a + x86_64 + riscv64) as app-release-future.apk
+# There is NO second assembleCompatRelease/assembleFutureRelease here: the
+# CI gate is the only release assemble; this script only verifies + uploads.
 #
-# Production assemble must pass -Pcompass.requireReleaseSigning=true so a
+# Production assemble in ci.sh must pass -Pcompass.requireReleaseSigning=true so a
 # missing keystore cannot silently fall back to debug signing.
 #
-# efreihub injects three secrets natively at the repo root, and ONLY on
-# default-branch (master) job runs (see docs/release-keys.md):
-#   EFREIHUB_TOKEN               env secret; write PAT for release
-#                                 create/upload.
-#   COMPASS_RELEASE_KEYSTORE     file secret materialized as
-#                                 release-keystore.jks.
-#   COMPASS_RELEASE_PASSWORD     file secret materialized as
-#                                 .password-signing-keys.
-# All three are write-only in the efreihub secret store: this script
-# can consume them but can never read their values back out of the
-# platform.
-#
-# CI honesty: on a default-branch push, a missing token or a missing
-# signing file is a misconfiguration, not something to shrug off, so
-# this script fails nonzero (does NOT skip) in that case. It skips
-# (exit 0) only for:
-#   - a tag ref, so creating the release tag cannot loop another publish
-#   - a push to a non-default branch, where efreihub does not inject
-#     these secrets at all, so there is nothing to publish from
+# efreihub injects EFREIHUB_TOKEN and native signing file secrets only on
+# default-branch runs. Missing token, signing files, or the ci.sh handoff
+# there is a hard failure (does NOT skip, does NOT rebuild, does NOT fall
+# back to debug). Tag and non-default-branch refs skip because they must
+# not publish.
 #
 set -euo pipefail
 
@@ -36,7 +24,6 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT_DIR"
 
 # Firecracker rootfs is read-only; guest HOME defaults to /root.
-# Publish is a separate step and does not inherit ci.sh exports.
 # Prefer /work (Firecracker work disk). Host-side signing-gate dry runs may
 # lack it; fall back under /tmp so fail-closed checks still run without
 # letting guest HOME=/root win in the guest.
@@ -55,8 +42,7 @@ export ANDROID_USER_HOME="${ANDROID_USER_HOME:-$HOME/.android}"
 mkdir -p "$ANDROID_USER_HOME"
 export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:+$JAVA_TOOL_OPTIONS }--sun-misc-unsafe-memory-access=allow --enable-native-access=ALL-UNNAMED -Duser.home=${HOME}"
 
-# AGP aapt2 is glibc; Alpine musl libgcc_s makes it SIGSEGV in the publish guest. ci.sh exports
-# this; publish is a separate Firecracker guest and does not inherit it.
+# Publish no longer runs Gradle assemble, but keep glibc for apksigner/tools.
 if [ -d /usr/glibc-compat/lib ]; then
   export LD_LIBRARY_PATH="/usr/glibc-compat/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
   echo "publish_ci_release: LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
@@ -64,7 +50,6 @@ fi
 
 REF="${EFREIHUB_REF:-}"
 DEFAULT_BRANCH_REF="${EFREIHUB_DEFAULT_BRANCH_REF:-refs/heads/master}"
-
 case "$REF" in
     refs/tags/*)
         echo "publish_ci_release: skip (ref is a tag: $REF; avoids a tag-triggered publish loop)"
@@ -73,14 +58,10 @@ case "$REF" in
 esac
 
 if [[ -n "$REF" && "$REF" != "$DEFAULT_BRANCH_REF" ]]; then
-    echo "publish_ci_release: skip (ref $REF is not the default branch $DEFAULT_BRANCH_REF; efreihub only injects EFREIHUB_TOKEN/signing secrets on default-branch job runs)"
+    echo "publish_ci_release: skip (ref $REF is not the default branch $DEFAULT_BRANCH_REF; efreihub only injects secrets on default-branch job runs)"
     exit 0
 fi
 
-# REF is either the default branch, or empty/unset (e.g. a manual run
-# outside the efreihub job). Either way this is treated as a
-# default-branch run: secrets are expected, and a missing one below is
-# a hard failure, not a silent skip.
 if [[ -z "${EFREIHUB_TOKEN:-}" ]]; then
     echo "ERROR: EFREIHUB_TOKEN is unset on a default-branch run (ref: ${REF:-unset}). efreihub injects this natively for default-branch jobs; a missing token here is a misconfiguration, not an expected skip." >&2
     exit 1
@@ -96,12 +77,8 @@ if [[ "$OWNER" == "$REPO_SLUG" || -z "$REPO" || "$REPO" == *"/"* ]]; then
     exit 1
 fi
 
-# Primary path: efreihub's native file secrets (COMPASS_RELEASE_KEYSTORE,
-# COMPASS_RELEASE_PASSWORD) are already materialized at the repo root as
-# release-keystore.jks / .password-signing-keys by the time this script
-# runs. SIGNING_DIR is a secondary/manual fallback (a bind-mounted or
-# operator-provisioned signing dir) kept for local testing and non-native
-# runner setups; it is not the expected path on efreihub itself anymore.
+# Primary path: efreihub native file secrets (COMPASS_RELEASE_KEYSTORE, COMPASS_RELEASE_PASSWORD) materialize at
+# repo root. SIGNING_DIR is a secondary/manual fallback for local testing.
 SIGNING_DIR="${COMPASS_SIGNING_DIR:-/usr/local/compass-signing}"
 if [[ ! -f "$ROOT_DIR/release-keystore.jks" && -f "$SIGNING_DIR/release-keystore.jks" ]]; then
     cp "$SIGNING_DIR/release-keystore.jks" "$ROOT_DIR/release-keystore.jks"
@@ -114,134 +91,96 @@ if [[ ! -f "$ROOT_DIR/release-keystore.jks" || ! -f "$ROOT_DIR/.password-signing
     exit 1
 fi
 
-BASE_VERSION_NAME="$(sed -n 's/^[[:space:]]*val baseVersionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -n 1)"
-if [[ -z "$BASE_VERSION_NAME" ]]; then
-    echo "ERROR: could not read baseVersionName from app/build.gradle.kts" >&2
+# Shared free-tag helpers + handoff path. Sourced after early skip / token /
+# signing fail-closed checks so check_release_signing_gate.sh dry runs
+# (temp copy of this script only) never need the sibling file.
+# shellcheck source=scripts/release_version.sh
+source "$ROOT_DIR/scripts/release_version.sh"
+
+# Consume the APKs ci.sh already assembled + stamped. Fail closed: never
+# rebuild, never fall back to a debug APK, never invent a tag.
+if ! HANDOFF_DIR="$(ci_release_handoff_dir)"; then
+    echo "ERROR: /work is not writable; cannot find ci.sh release handoff (expected /work/compass-ci-release). publish must upload the APKs from the CI gate, not assemble again." >&2
+    exit 1
+fi
+MANIFEST="$HANDOFF_DIR/manifest.env"
+HANDOFF_COMPAT="$HANDOFF_DIR/app-release.apk"
+HANDOFF_FUTURE="$HANDOFF_DIR/app-release-future.apk"
+if [[ ! -f "$MANIFEST" || ! -f "$HANDOFF_COMPAT" || ! -f "$HANDOFF_FUTURE" ]]; then
+    echo "ERROR: missing ci.sh release handoff at $HANDOFF_DIR (need app-release.apk, app-release-future.apk, manifest.env). The CI gate must leave signed stamped fat APKs for publish; refusing to assemble again or fall back to debug." >&2
+    ls -la "$HANDOFF_DIR" >&2 2>/dev/null || true
     exit 1
 fi
 
-safe_json_token() {
-    printf '%s' "$1" | tr -cd 'A-Za-z0-9._/-'
-}
+# shellcheck disable=SC1090
+source "$MANIFEST"
+if [[ -z "${TAG:-}" || -z "${VERSION_NAME:-}" || -z "${VERSION_CODE:-}" || -z "${SHA256_COMPAT:-}" || -z "${SHA256_FUTURE:-}" ]]; then
+    echo "ERROR: $MANIFEST missing TAG / VERSION_NAME / VERSION_CODE / SHA256_COMPAT / SHA256_FUTURE" >&2
+    exit 1
+fi
+if [[ "$TAG" != "v${VERSION_NAME}" ]]; then
+    echo "ERROR: handoff TAG ($TAG) does not match VERSION_NAME ($VERSION_NAME)" >&2
+    exit 1
+fi
 
-# First three numeric dotted components; extra timestamp parts are ignored.
-version_triple() {
-    local t="${1#v}"
-    t="${t%%-*}"
-    local maj min pat
-    maj="${t%%.*}"
-    t="${t#*.}"
-    if [[ "$maj" == "$t" ]]; then
-        min=0
-        pat=0
-    else
-        min="${t%%.*}"
-        t="${t#*.}"
-        if [[ "$min" == "$t" ]]; then
-            pat=0
-        else
-            pat="${t%%.*}"
-        fi
+verify_apk() {
+    local file="$1"
+    local expect_sha="$2"
+    local label="$3"
+    local actual magic
+    actual="$(sha256sum "$file" | awk '{print $1}')"
+    if [[ "$actual" != "$expect_sha" ]]; then
+        echo "ERROR: handoff $label sha256 mismatch (manifest=$expect_sha actual=$actual)" >&2
+        exit 1
     fi
-    maj="${maj%%[!0-9]*}"
-    min="${min%%[!0-9]*}"
-    pat="${pat%%[!0-9]*}"
-    printf '%s %s %s\n' "${maj:-0}" "${min:-0}" "${pat:-0}"
+    magic="$(od -An -tx1 -N4 "$file" | tr -d " \n")"
+    if [[ "$magic" != "504b0304" ]]; then
+        echo "ERROR: handoff $label is not a zip/APK (magic=$magic): $file" >&2
+        exit 1
+    fi
 }
+verify_apk "$HANDOFF_COMPAT" "$SHA256_COMPAT" "compat"
+verify_apk "$HANDOFF_FUTURE" "$SHA256_FUTURE" "future"
 
-version_gt() {
-    local a_maj a_min a_pat b_maj b_min b_pat
-    read -r a_maj a_min a_pat <<<"$(version_triple "$1")"
-    read -r b_maj b_min b_pat <<<"$(version_triple "$2")"
-    if (( a_maj > b_maj )); then return 0; fi
-    if (( a_maj < b_maj )); then return 1; fi
-    if (( a_min > b_min )); then return 0; fi
-    if (( a_min < b_min )); then return 1; fi
-    (( a_pat > b_pat ))
-}
+APKSIGNER=""
+shopt -s nullglob
+for candidate in \
+    /work/android-sdk/build-tools/*/apksigner \
+    ${ANDROID_HOME:+"$ANDROID_HOME"/build-tools/*/apksigner}
+do
+    if [[ -x "$candidate" ]]; then
+        APKSIGNER="$candidate"
+        break
+    fi
+done
+shopt -u nullglob
+if [[ -n "$APKSIGNER" ]]; then
+    echo "publish_ci_release: verifying signatures with $APKSIGNER"
+    "$APKSIGNER" verify --verbose "$HANDOFF_COMPAT" >/dev/null
+    "$APKSIGNER" verify --verbose "$HANDOFF_FUTURE" >/dev/null
+else
+    echo "publish_ci_release: apksigner not found; relying on ci.sh signing gate + sha256"
+fi
 
-increment_patch() {
-    local maj min pat
-    read -r maj min pat <<<"$(version_triple "$1")"
-    printf '%s.%s.%s\n' "$maj" "$min" "$((pat + 1))"
-}
+TARGET="$(safe_json_token "${EFREIHUB_SHA:-}")"
+BODY="CI $(safe_json_token "${REF:-unknown}") $(safe_json_token "${TARGET:-unknown}")"
+echo "publish_ci_release: uploading ci.sh artifacts ${TAG} (versionCode ${VERSION_CODE}, compat=${SHA256_COMPAT}, future=${SHA256_FUTURE})"
 
 AUTH_HEADER="Authorization: Bearer ${EFREIHUB_TOKEN}"
 RELEASE_JSON="$ROOT_DIR/.ci-release-create.json"
 GET_JSON="$ROOT_DIR/.ci-release-get.json"
-LIST_JSON="$ROOT_DIR/.ci-release-list.json"
 create_payload="$ROOT_DIR/.ci-release-payload.json"
-trap 'rm -f "$RELEASE_JSON" "$GET_JSON" "$LIST_JSON" "$create_payload"' EXIT
+trap 'rm -f "$RELEASE_JSON" "$GET_JSON" "$create_payload"' EXIT
 
 json_field() {
     local file="$1"
     local key="$2"
-    sed -n "s/.*\"${key}\"[[:space:]]*:[[:space:]]*\"\\([^\"]*\\)\".*/\\1/p" "$file" | head -n 1
+    sed -n "s/.*\"${key}\"[[:space:]]*:[[:space:]]*\"\([^\"]*\)\".*/\1/p" "$file" | head -n 1
 }
 
-list_code="$(curl -sS -o "$LIST_JSON" -w '%{http_code}' \
-    -H "$AUTH_HEADER" \
-    -H "Accept: application/json" \
-    "${API_BASE}/repos/${OWNER}/${REPO}/releases" || true)"
-if [[ "$list_code" != "200" ]]; then
-    echo "ERROR: list releases HTTP ${list_code}" >&2
-    cat "$LIST_JSON" >&2 || true
-    exit 1
-fi
-
-HIGHEST="$BASE_VERSION_NAME"
-while IFS= read -r tag; do
-    [[ -z "$tag" ]] && continue
-    if version_gt "$tag" "$HIGHEST"; then
-        HIGHEST="${tag#v}"
-        HIGHEST="${HIGHEST%%-*}"
-        # Keep only X.Y.Z for increment (drop leftover timestamp components).
-        read -r maj min pat <<<"$(version_triple "$HIGHEST")"
-        HIGHEST="${maj}.${min}.${pat}"
-    fi
-done < <(sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$LIST_JSON")
-
-TAG="v$(increment_patch "$HIGHEST")"
-VERSION_NAME="${TAG#v}"
-STAMP="$(date +%s)"
-TARGET="$(safe_json_token "${EFREIHUB_SHA:-}")"
-BODY="CI $(safe_json_token "${REF:-unknown}") $(safe_json_token "${TARGET:-unknown}")"
-
-echo "publish_ci_release: assembling signed APKs as ${TAG} (versionCode ${STAMP})"
-./scripts/run_gradle.sh assembleCompatRelease assembleFutureRelease \
-    -Pcompass.requireReleaseSigning=true \
-    -Pcompass.versionName="$VERSION_NAME" \
-    -Pcompass.versionCode="$STAMP"
-
-# Fat APKs (ndk.abiFilters, no ABI splits). AGP names have varied; accept
-# both the unsplit flavor name and a leftover *universal* layout.
-find_fat_apk() {
-    local flavor="$1"
-    local dir="$ROOT_DIR/app/build/outputs/apk/${flavor}/release"
-    local candidate
-    for candidate in \
-        "$dir/app-${flavor}-release.apk" \
-        "$dir/app-${flavor}-universal-release.apk" \
-        "$dir/app-${flavor}-release-universal.apk"
-    do
-        if [[ -f "$candidate" ]]; then
-            printf '%s\n' "$candidate"
-            return 0
-        fi
-    done
-    return 1
-}
-
-COMPAT_APK="$(find_fat_apk compat || true)"
-FUTURE_APK="$(find_fat_apk future || true)"
-if [[ -z "$COMPAT_APK" || -z "$FUTURE_APK" ]]; then
-    echo "ERROR: missing fat APKs (compat='$COMPAT_APK' future='$FUTURE_APK')" >&2
-    find "$ROOT_DIR/app/build/outputs/apk" -name '*.apk' -print >&2 || true
-    exit 1
-fi
-UPLOAD_FILES=("$COMPAT_APK" "$FUTURE_APK")
-UPLOAD_NAMES=("app-release.apk" "app-release-future.apk")
-
+# Tag was probed free in ci.sh before assemble. A create race is rare; fail
+# closed rather than reusing an existing release (asset re-upload returns
+# HTTP 400) or rebuilding with a different versionName.
 if [[ -n "$TARGET" ]]; then
     printf '{"tag_name":"%s","name":"%s","body":"%s","target_commitish":"%s"}\n' \
         "$TAG" "$TAG" "$BODY" "$TARGET" > "$create_payload"
@@ -249,7 +188,6 @@ else
     printf '{"tag_name":"%s","name":"%s","body":"%s"}\n' \
         "$TAG" "$TAG" "$BODY" > "$create_payload"
 fi
-
 code="$(curl -sS -o "$RELEASE_JSON" -w '%{http_code}' \
     -H "$AUTH_HEADER" \
     -H "Accept: application/json" \
@@ -257,25 +195,14 @@ code="$(curl -sS -o "$RELEASE_JSON" -w '%{http_code}' \
     -X POST \
     --data-binary @"$create_payload" \
     "${API_BASE}/repos/${OWNER}/${REPO}/releases" || true)"
-
 RELEASE_ID=""
 if [[ "$code" == "201" ]]; then
     RELEASE_ID="$(json_field "$RELEASE_JSON" id)"
 else
-    get_code="$(curl -sS -o "$GET_JSON" -w '%{http_code}' \
-        -H "$AUTH_HEADER" \
-        -H "Accept: application/json" \
-        "${API_BASE}/repos/${OWNER}/${REPO}/releases/tags/${TAG}" || true)"
-    if [[ "$get_code" == "200" ]]; then
-        RELEASE_ID="$(json_field "$GET_JSON" id)"
-        echo "publish_ci_release: release ${TAG} already exists (${RELEASE_ID})"
-    else
-        echo "ERROR: create release HTTP ${code}; get-by-tag HTTP ${get_code}" >&2
-        cat "$RELEASE_JSON" >&2 || true
-        exit 1
-    fi
+    echo "ERROR: create release ${TAG} HTTP ${code} (tag was probed free in ci.sh; retry the job)" >&2
+    cat "$RELEASE_JSON" >&2 || true
+    exit 1
 fi
-
 if [[ -z "$RELEASE_ID" ]]; then
     echo "ERROR: could not parse release id" >&2
     exit 1
@@ -294,10 +221,7 @@ upload_asset() {
         >/dev/null
 }
 
-i=0
-while (( i < ${#UPLOAD_FILES[@]} )); do
-    upload_asset "${UPLOAD_FILES[$i]}" "${UPLOAD_NAMES[$i]}"
-    i=$((i + 1))
-done
+upload_asset "$HANDOFF_COMPAT" "app-release.apk"
+upload_asset "$HANDOFF_FUTURE" "app-release-future.apk"
 
-echo "publish_ci_release: published ${TAG} (${RELEASE_ID})"
+echo "publish_ci_release: published ${TAG} (${RELEASE_ID}) from ci.sh handoff (no rebuild)"

@@ -10,9 +10,9 @@
 # itself, so this workflow does not repeat those two checks as a
 # separate step.
 #
-# After a green ci.sh it runs ./scripts/publish_ci_release.sh: signed
-# assemble, next patch git tag, efreihub release, and two fat APKs
-# (compat + future). Publish only skips (exit 0) for a tag ref (avoids
+# After a green ci.sh the same guest runs ./scripts/publish_ci_release.sh:
+# upload the stamped fat APKs ci.sh staged (no second assemble), next
+# patch git tag, and efreihub release (compat + future). Publish only skips (exit 0) for a tag ref (avoids
 # a tag-triggered publish loop) or a push to a non-default branch
 # (efreihub does not inject repo secrets there). On a default-branch
 # push it fails nonzero, not skip, when EFREIHUB_TOKEN or a signing
@@ -49,7 +49,9 @@ jobs:
     concurrency:
       group: ci
       cancel-in-progress: true
-    # Persist Gradle home (deps/wrapper/build-cache) across green default-branch runs.
+    # Persist compile inputs across green default-branch runs on the runner host.
+    # Fail/cancel keeps the previous green layer (n-1). Paths are /work-relative.
+    # Do not cache app/build or .cxx (stale outputs mixed with sources).
     project-cache:
       - path: .gradle
         key: gradle
@@ -82,14 +84,11 @@ jobs:
           test -x ./scripts/ci.sh
           test -f ./scripts/publish_ci_release.sh
 
-      - name: scripts/ci.sh
+      # One guest for gate + publish: avoids a second cold Firecracker boot
+      # and keeps /work handoff + Gradle/SDK caches warm.
+      - name: scripts/ci.sh + publish
         run: |
           set -eu
-          chmod +x ./scripts/ci.sh
+          chmod +x ./scripts/ci.sh ./scripts/publish_ci_release.sh
           ./scripts/ci.sh
-
-      - name: publish tagged release
-        run: |
-          set -eu
-          chmod +x ./scripts/publish_ci_release.sh
           ./scripts/publish_ci_release.sh

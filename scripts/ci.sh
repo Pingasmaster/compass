@@ -36,6 +36,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT_DIR"
 
+# Shared free-tag / handoff helpers (used when EFREIHUB_TOKEN is set).
+# shellcheck source=scripts/release_version.sh
+source "$ROOT_DIR/scripts/release_version.sh"
+
 # Prefer a real JDK 27 (Firecracker guest Temurin 27 EA), then JDK 26.
 # Wrap it so Gradle Worker Daemons also get the JEP 498 / JEP 472 opt-in flags.
 # ensure-jdk26-home.sh is a JEP-flag wrapper; keep sourcing it when JAVA_HOME is 27.
@@ -221,10 +225,83 @@ echo "Verifying unit tests actually ran..."
 echo "Assembling debug APKs..."
 gradle "${DEBUG_ASSEMBLE_TASKS[@]}"
 
+
+# Default-branch runs inject EFREIHUB_TOKEN. Stamp the free tag into the
+# gated release assemble so publish can upload these APKs without rebuilding.
+RELEASE_TAG=""
+RELEASE_VERSION_NAME=""
+RELEASE_VERSION_CODE=""
+HANDOFF_DIR=""
+if [[ -n "${EFREIHUB_TOKEN:-}" ]]; then
+    if ! HANDOFF_DIR="$(ci_release_handoff_dir)"; then
+        echo "ERROR: EFREIHUB_TOKEN is set but /work is not writable; cannot stage signed release APKs for publish (expected /work/compass-ci-release)." >&2
+        exit 1
+    fi
+    BASE_VERSION_NAME="$(sed -n 's/^[[:space:]]*val baseVersionName = "\([^"]*\)".*/\1/p' app/build.gradle.kts | head -n 1)"
+    if [[ -z "$BASE_VERSION_NAME" ]]; then
+        echo "ERROR: could not read baseVersionName from app/build.gradle.kts" >&2
+        exit 1
+    fi
+    PROBE_WORK="$HANDOFF_DIR/.probe"
+    mkdir -p "$PROBE_WORK"
+    probe_free_release_tag "$PROBE_WORK" "$BASE_VERSION_NAME"
+    rm -rf "$PROBE_WORK"
+    RELEASE_VERSION_CODE="$(date +%s)"
+    RELEASE_SIGNING_PROPS+=(
+        -Pcompass.versionName="$RELEASE_VERSION_NAME"
+        -Pcompass.versionCode="$RELEASE_VERSION_CODE"
+    )
+    echo "CI: stamping release assemble as ${RELEASE_TAG} (versionCode ${RELEASE_VERSION_CODE})"
+fi
+
 echo "Running release lint and assemble (requireReleaseSigning=true)..."
 gradle "${RELEASE_SIGNING_PROPS[@]}" "${GRADLE_TASKS[@]}"
 
 ./scripts/check_elf_16k_alignment.sh "$GRADLE_APK_COMPAT" "$GRADLE_APK_FUTURE"
+
+# Stage gated signed fat APKs for publish_ci_release.sh (same Firecracker guest).
+if [[ -n "${EFREIHUB_TOKEN:-}" ]]; then
+    find_fat_apk() {
+        local flavor="$1"
+        local dir="$ROOT_DIR/app/build/outputs/apk/${flavor}/release"
+        local candidate
+        for candidate in \
+            "$dir/app-${flavor}-release.apk" \
+            "$dir/app-${flavor}-universal-release.apk" \
+            "$dir/app-${flavor}-release-universal.apk"
+        do
+            if [[ -f "$candidate" ]]; then
+                printf '%s\n' "$candidate"
+                return 0
+            fi
+        done
+        return 1
+    }
+    COMPAT_APK="$(find_fat_apk compat || true)"
+    FUTURE_APK="$(find_fat_apk future || true)"
+    if [[ -z "$COMPAT_APK" || -z "$FUTURE_APK" ]]; then
+        echo "ERROR: missing fat APKs after release assemble (compat='$COMPAT_APK' future='$FUTURE_APK')" >&2
+        find "$ROOT_DIR/app/build/outputs/apk" -name '*.apk' -print >&2 || true
+        exit 1
+    fi
+    rm -rf "$HANDOFF_DIR"
+    mkdir -p "$HANDOFF_DIR"
+    cp -f "$COMPAT_APK" "$HANDOFF_DIR/app-release.apk"
+    cp -f "$FUTURE_APK" "$HANDOFF_DIR/app-release-future.apk"
+    SHA256_COMPAT="$(sha256sum "$HANDOFF_DIR/app-release.apk" | awk '{print $1}')"
+    SHA256_FUTURE="$(sha256sum "$HANDOFF_DIR/app-release-future.apk" | awk '{print $1}')"
+    {
+        printf 'TAG=%s\n' "$RELEASE_TAG"
+        printf 'VERSION_NAME=%s\n' "$RELEASE_VERSION_NAME"
+        printf 'VERSION_CODE=%s\n' "$RELEASE_VERSION_CODE"
+        printf 'SHA256_COMPAT=%s\n' "$SHA256_COMPAT"
+        printf 'SHA256_FUTURE=%s\n' "$SHA256_FUTURE"
+        printf 'COMPAT_APK_NAME=app-release.apk\n'
+        printf 'FUTURE_APK_NAME=app-release-future.apk\n'
+    } > "$HANDOFF_DIR/manifest.env"
+    echo "CI: staged signed fat APKs for publish at $HANDOFF_DIR (${RELEASE_TAG}, compat=${SHA256_COMPAT}, future=${SHA256_FUTURE})"
+fi
+
 
 if [[ -e /dev/kvm ]]; then
     echo "CI: running shippedsmoke, then smoke + e2e on one API 37 GMD..."

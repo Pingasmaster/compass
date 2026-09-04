@@ -189,4 +189,31 @@ grep -q -- '-Pcompass.requireReleaseSigning=true' "$BUILD_SH" \
     || fail "$BUILD_SH no longer passes -Pcompass.requireReleaseSigning=true on the release path"
 
 echo "check_release_signing_gate: D OK (local build.sh still requires release signing)."
+
+echo "== E. publish uploads ci.sh handoff; no second release assemble =="
+
+strip_comments_pub() {
+    # Drop full-line comments and blank lines for invocation greps.
+    sed -e '/^[[:space:]]*#/d' -e '/^[[:space:]]*$/d' "$1"
+}
+
+PUBLISH_CODE="$(strip_comments_pub "$PUBLISH_SH")"
+if echo "$PUBLISH_CODE" | grep -Eq -- '(run_gradle\.sh|gradlew|[[:space:]]gradle)[[:space:]].*assemble(Compat|Future)?Release|assemble(Compat|Future)?Release[[:space:]]+-P'; then
+    fail "$PUBLISH_SH still invokes assembleRelease - publish must upload the ci.sh handoff APKs only"
+fi
+echo "$PUBLISH_CODE" | grep -q -- 'compass-ci-release' \
+    || fail "$PUBLISH_SH no longer looks for the /work/compass-ci-release handoff from ci.sh"
+echo "$PUBLISH_CODE" | grep -q -- 'manifest.env' \
+    || fail "$PUBLISH_SH no longer reads manifest.env from the ci.sh handoff"
+
+CI_CODE_D="$(strip_comments_pub "$CI_SH")"
+echo "$CI_CODE_D" | grep -q -- 'compass-ci-release' \
+    || fail "$CI_SH no longer stages the signed APKs under compass-ci-release for publish"
+echo "$CI_CODE_D" | grep -q -- 'probe_free_release_tag' \
+    || fail "$CI_SH no longer probes a free release tag before the gated release assemble"
+echo "$CI_CODE_D" | grep -q -- '-Pcompass.versionName=' \
+    || fail "$CI_SH no longer stamps -Pcompass.versionName into the gated release assemble"
+
+echo "check_release_signing_gate: E OK (single release assemble in ci.sh; publish consumes /work handoff)."
+
 echo "check_release_signing_gate: OK."
