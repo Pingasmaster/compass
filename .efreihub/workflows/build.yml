@@ -49,6 +49,10 @@ jobs:
     concurrency:
       group: ci
       cancel-in-progress: true
+    # Persist Gradle home (deps/wrapper/build-cache) across green default-branch runs.
+    project-cache:
+      - path: .gradle
+        key: gradle
     guest:
       packages:
         - bash
