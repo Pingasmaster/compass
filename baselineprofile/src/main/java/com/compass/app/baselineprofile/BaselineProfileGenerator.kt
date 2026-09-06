@@ -7,7 +7,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-private const val TARGET_PACKAGE = "com.compass.app"
+private const val TARGET_PACKAGE = "app.efrei.compass"
 
 /**
  * Captures baseline + startup profiles for the Compass app.

@@ -3,7 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <queries>
-        <package android:name="com.compass.app" />
+        <package android:name="app.efrei.compass" />
     </queries>
 
     <application

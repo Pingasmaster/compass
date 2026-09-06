@@ -54,7 +54,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.compass.app"
+        applicationId = "app.efrei.compass"
         targetSdk = 37
         versionCode = effectiveVersionCode
         versionName = effectiveVersionName

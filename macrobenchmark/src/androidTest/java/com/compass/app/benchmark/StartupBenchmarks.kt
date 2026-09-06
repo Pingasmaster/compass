@@ -24,7 +24,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
-private const val PACKAGE_NAME = "com.compass.app"
+private const val PACKAGE_NAME = "app.efrei.compass"
 
 @RunWith(AndroidJUnit4::class)
 class StartupBenchmarks {

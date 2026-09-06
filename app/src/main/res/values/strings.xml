@@ -1,8 +1,8 @@
 <resources>
-    <string name="app_name">Compass</string>
+    <string name="app_name">Efrei Compass</string>
 
     <!-- Top bar -->
-    <string name="title_compass">Compass</string>
+    <string name="title_compass">Efrei Compass</string>
     <string name="action_set_target_angle">Set target angle</string>
     <string name="action_settings">Settings</string>
 

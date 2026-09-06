@@ -10,7 +10,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
-private const val PACKAGE = "com.compass.app"
+private const val PACKAGE = "app.efrei.compass"
 private const val LAUNCH_TIMEOUT_MS = 60_000L
 private const val UI_TIMEOUT_MS = 30_000L
 

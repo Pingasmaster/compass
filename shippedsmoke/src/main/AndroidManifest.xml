@@ -4,7 +4,7 @@
     <!-- Package visibility: without this, getLaunchIntentForPackage returns
          null on API 30+ and the smoke cannot start the app under test. -->
     <queries>
-        <package android:name="com.compass.app" />
+        <package android:name="app.efrei.compass" />
     </queries>
 
 </manifest>

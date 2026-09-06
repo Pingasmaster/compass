@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="logo.png" width="100" alt="Compass icon"/>
+  <img src="logo.png" width="100" alt="Efrei Compass icon"/>
 </p>
 
-<h1 align="center">Compass</h1>
+<h1 align="center">Efrei Compass</h1>
 
 <p align="center">
   <b>A clean, expressive compass for Android</b><br/>
