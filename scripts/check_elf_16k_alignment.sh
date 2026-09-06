@@ -64,6 +64,10 @@ if [[ "$fail" -eq 0 ]]; then
 fi
 
 locate_zipalign() {
+    if [[ -n "${ZIPALIGN:-}" && -x "$ZIPALIGN" ]]; then
+        printf '%s\n' "$ZIPALIGN"
+        return 0
+    fi
     local sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
     if [[ -z "$sdk" && -f "$ROOT/local.properties" ]]; then
         sdk="$(sed -n 's/^sdk.dir=//p' "$ROOT/local.properties" | head -1 | tr -d '\r' | sed 's/\\:/:/g')"
@@ -82,10 +86,24 @@ locate_zipalign() {
     return 1
 }
 
+# SDK zipalign is a glibc PIE. On the Alpine guest it SIGSEGVs at ip 0x4310
+# unless it is exec'd through the baked GNU loader (same as aapt2). Skip
+# that prefix when the path is already a shell wrapper.
+run_zipalign() {
+    local bin="$1"
+    shift
+    local hdr
+    hdr="$(head -c 4 "$bin" 2>/dev/null || true)"
+    if [[ "$hdr" == $'\177ELF' && -x /opt/gnu/ld-linux-x86-64.so.2 && -e /opt/gnu/libc.so.6 ]]; then
+        /opt/gnu/ld-linux-x86-64.so.2 --library-path /opt/gnu "$bin" "$@"
+    else
+        "$bin" "$@"
+    fi
+}
+
 if [[ "$#" -gt 0 ]]; then
-    ZIPALIGN=""
-    ZIPALIGN="$(locate_zipalign || true)"
-    if [[ -z "$ZIPALIGN" ]]; then
+    zipalign_bin="$(locate_zipalign || true)"
+    if [[ -z "$zipalign_bin" ]]; then
         echo "WARN: zipalign not found under Android SDK build-tools;" \
             "skipping APK zip alignment check." >&2
     else
@@ -95,7 +113,7 @@ if [[ "$#" -gt 0 ]]; then
                 fail=1
                 continue
             fi
-            if ! "$ZIPALIGN" -c -P 16 4 "$apk"; then
+            if ! run_zipalign "$zipalign_bin" -c -P 16 4 "$apk"; then
                 echo "ERROR: $apk failed zipalign -c -P 16 4." >&2
                 fail=1
             else

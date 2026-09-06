@@ -42,7 +42,7 @@ fi
 
 echo "CI: GNU aapt2 loader $GNU_LD lib=$GNU_ROOT"
 
-wrap_aapt2() {
+wrap_glibc_bin() {
     local bin="$1"
     local real="${bin}.real"
     local hdr
@@ -59,11 +59,10 @@ wrap_aapt2() {
     fi
     cat >"$bin" <<WRAP
 #!/bin/sh
-export LD_LIBRARY_PATH="${GNU_ROOT}\${LD_LIBRARY_PATH:+:\$LD_LIBRARY_PATH}"
 exec ${GNU_LD} --library-path "${GNU_ROOT}" ${real} "\$@"
 WRAP
     chmod +x "$bin" "$real"
-    echo "CI: wrapped aapt2 $bin via $GNU_LD"
+    echo "CI: wrapped $(basename "$bin") $bin via $GNU_LD"
 }
 
 DEST=/work/aapt2
@@ -91,11 +90,20 @@ fi
 echo "CI: using SDK aapt2 $SDK_AAPT2"
 cp -a "$SDK_AAPT2" "$DEST/aapt2"
 chmod +x "$DEST/aapt2"
-wrap_aapt2 "$DEST/aapt2"
+wrap_glibc_bin "$DEST/aapt2"
+
+SDK_DIR="$(dirname "$SDK_AAPT2")"
+if [ -f "$SDK_DIR/zipalign" ]; then
+    cp -a "$SDK_DIR/zipalign" "$DEST/zipalign"
+    chmod +x "$DEST/zipalign"
+    wrap_glibc_bin "$DEST/zipalign"
+    export ZIPALIGN="$DEST/zipalign"
+    echo "CI: ZIPALIGN=$ZIPALIGN"
+fi
 
 if [ -d "${GRADLE_USER_HOME:-}/caches" ]; then
     while IFS= read -r bin; do
-        wrap_aapt2 "$bin"
+        wrap_glibc_bin "$bin"
     done < <(find "${GRADLE_USER_HOME}/caches" -type f -name aapt2 2>/dev/null | head -50)
 fi
 
@@ -114,5 +122,5 @@ if ! "$AAPT2_OVERRIDE" version >/dev/null 2>&1; then
 fi
 echo "CI: aapt2 version: $("$AAPT2_OVERRIDE" version 2>/dev/null | head -1)"
 
-unset -f wrap_aapt2
-unset GNU_ROOT GNU_LD DEST SDK_AAPT2 AAPT2_OVERRIDE cand bin
+unset -f wrap_glibc_bin
+unset GNU_ROOT GNU_LD DEST SDK_AAPT2 SDK_DIR AAPT2_OVERRIDE cand bin
