@@ -36,6 +36,40 @@ if [ -d /usr/glibc-compat/lib ]; then
   echo "CI: exported LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
 fi
 
+# AGP launches aapt2 as a native daemon from Gradle workers. Those JVMs
+# often miss the CI shell LD_LIBRARY_PATH, so wrap every cached aapt2
+# ELF with a shim that exports GNU libgcc_s before exec.
+wrap_aapt2_bin() {
+    local bin="$1"
+    local real="${bin}.glibc"
+    [ -f "$bin" ] || return 0
+    [ -f "$real" ] && return 0
+    local magic
+    magic="$(head -c 4 "$bin" || true)"
+    [ "$magic" = $'\177ELF' ] || return 0
+    mv "$bin" "$real"
+    cat > "$bin" <<'WRAP'
+#!/bin/sh
+if [ -d /usr/glibc-compat/lib ]; then
+  LD_LIBRARY_PATH="/usr/glibc-compat/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+  export LD_LIBRARY_PATH
+fi
+exec "$(dirname "$0")/$(basename "$0").glibc" "$@"
+WRAP
+    chmod +x "$bin" "$real"
+}
+
+patch_aapt2() {
+    local n=0 bin
+    [ -d "$GRADLE_USER_HOME" ] || return 0
+    while IFS= read -r bin; do
+        wrap_aapt2_bin "$bin"
+        n=$((n + 1))
+    done < <(find "$GRADLE_USER_HOME" -type f -name aapt2 2>/dev/null)
+    echo "CI: aapt2 wrap candidates=$n under $GRADLE_USER_HOME"
+}
+patch_aapt2 || true
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT_DIR"
@@ -87,6 +121,14 @@ fi
 # shellcheck source=scripts/ensure-jdk26-home.sh
 source "$ROOT_DIR/scripts/ensure-jdk26-home.sh"
 
+# Daemon toolchain execs the real JDK and drops the wrapper environment
+# (GNU libgcc_s for aapt2). Pin the daemon onto JAVA_HOME (the wrapper).
+{
+    printf '\norg.gradle.java.home=%s\n' "$JAVA_HOME"
+    printf 'org.gradle.daemon.toolchain.enabled=false\n'
+} >> "$ROOT_DIR/gradle.properties"
+echo "CI: pinned Gradle daemon java.home=$JAVA_HOME"
+
 export ANDROID_USER_HOME="${ANDROID_USER_HOME:-$HOME/.android}"
 mkdir -p "$ANDROID_USER_HOME"
 export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:+$JAVA_TOOL_OPTIONS }--sun-misc-unsafe-memory-access=allow --enable-native-access=ALL-UNNAMED -Duser.home=${HOME}"
@@ -130,7 +172,13 @@ GMD_GPU=(-Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect)
 
 GRADLE_CMD=(./scripts/run_gradle.sh)
 gradle() {
+    patch_aapt2 || true
+    set +e
     "${GRADLE_CMD[@]}" "$@"
+    local rc=$?
+    set -e
+    patch_aapt2 || true
+    return "$rc"
 }
 
 gmd_setup() {
