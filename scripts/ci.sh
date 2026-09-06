@@ -24,7 +24,7 @@ set -euo pipefail
 # Firecracker rootfs is read-only. Keep Gradle/JDK state on the work disk.
 export HOME=/work/.efreihub-home
 export GRADLE_USER_HOME="${GRADLE_USER_HOME:-/work/.gradle}"
-export TMPDIR="${TMPDIR:-/work/tmp}"
+export TMPDIR=/work/tmp
 mkdir -p "$HOME" "$GRADLE_USER_HOME" "$TMPDIR"
 # Robolectric opens a temp dir per test class; guest default nofile is too low.
 ulimit -n 1048576 2>/dev/null || ulimit -n 65536 2>/dev/null || true
@@ -70,33 +70,53 @@ patch_aapt2() {
 }
 
 fetch_url() {
-    local url="$1" out="$2"
-    if command -v curl >/dev/null 2>&1; then
-        curl -fsSL -o "$out" "$url"
-    elif command -v wget >/dev/null 2>&1; then
-        wget -q -O "$out" "$url"
-    else
-        python3 -c "import urllib.request; urllib.request.urlretrieve('$url', '$out')"
-    fi
+    local url="$1" out="$2" attempt=1 max=4 rc=0
+    while [ "$attempt" -le "$max" ]; do
+        set +e
+        if command -v curl >/dev/null 2>&1; then
+            curl -fsSL --retry 2 --retry-delay 2 -o "$out" "$url"
+            rc=$?
+        elif command -v wget >/dev/null 2>&1; then
+            wget -q -O "$out" "$url"
+            rc=$?
+        else
+            python3 -c "import urllib.request; urllib.request.urlretrieve('$url', '$out')"
+            rc=$?
+        fi
+        set -e
+        if [ "$rc" -eq 0 ] && [ -s "$out" ]; then
+            return 0
+        fi
+        echo "CI: fetch attempt ${attempt}/${max} failed rc=${rc} url=$url"
+        sleep $((attempt * 15))
+        attempt=$((attempt + 1))
+    done
+    return 1
 }
 
 # Failed CI guests do not persist .gradle, so wrap-after-crash never sticks.
 # Seed a wrapped aapt2 before the first resource compile and point AGP at it.
 seed_aapt2() {
     local dest="/work/aapt2"
-    local jar="" ver agp
+    local jar="" ver agp sdk_aapt2
     mkdir -p "$dest"
-    jar="$(find "$GRADLE_USER_HOME/caches" -name 'aapt2-*-linux.jar' 2>/dev/null | sort | tail -1 || true)"
-    if [ -z "$jar" ] || [ ! -f "$jar" ]; then
-        agp="$(sed -n 's/^agp = "\(.*\)"/\1/p' "$ROOT_DIR/gradle/libs.versions.toml" | head -1)"
-        ver="${agp}-15978811"
-        echo "CI: downloading aapt2 $ver"
-        fetch_url \
-            "https://dl.google.com/android/maven2/com/android/tools/build/aapt2/${ver}/aapt2-${ver}-linux.jar" \
-            "$dest/aapt2-linux.jar"
-        jar="$dest/aapt2-linux.jar"
+    sdk_aapt2="$(find /opt/android-sdk /work/android-sdk -type f -name aapt2 2>/dev/null | head -1 || true)"
+    if [ -n "$sdk_aapt2" ] && [ -f "$sdk_aapt2" ]; then
+        echo "CI: using SDK aapt2 $sdk_aapt2"
+        cp -a "$sdk_aapt2" "$dest/aapt2"
+    else
+        jar="$(find "$GRADLE_USER_HOME/caches" -name 'aapt2-*-linux.jar' 2>/dev/null | sort | tail -1 || true)"
+        if [ -z "$jar" ] || [ ! -f "$jar" ]; then
+            agp="$(sed -n 's/^agp = "\(.*\)"/\1/p' "$ROOT_DIR/gradle/libs.versions.toml" | head -1)"
+            ver="${agp}-15978811"
+            echo "CI: downloading aapt2 $ver"
+            fetch_url \
+                "https://dl.google.com/android/maven2/com/android/tools/build/aapt2/${ver}/aapt2-${ver}-linux.jar" \
+                "$dest/aapt2-linux.jar"
+            jar="$dest/aapt2-linux.jar"
+        fi
+        unzip -o -q -d "$dest" "$jar" aapt2
     fi
-    unzip -o -q -d "$dest" "$jar" aapt2
     chmod +x "$dest/aapt2"
     seed_gnu_libs
     python3 "$ROOT_DIR/scripts/patch_elf_interp.py" "$dest/aapt2" /work/gnu/ld.so
@@ -247,12 +267,25 @@ GMD_GPU=(-Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect)
 GRADLE_CMD=(./scripts/run_gradle.sh)
 gradle() {
     patch_aapt2 || true
-    set +e
-    "${GRADLE_CMD[@]}" "$@"
-    local rc=$?
-    set -e
-    patch_aapt2 || true
-    return "$rc"
+    local attempt=1 max=4 rc
+    while true; do
+        set +e
+        "${GRADLE_CMD[@]}" "$@"
+        rc=$?
+        set -e
+        if [ "$rc" -eq 0 ]; then
+            patch_aapt2 || true
+            return 0
+        fi
+        if [ "$attempt" -lt "$max" ]; then
+            echo "CI: gradle_dns_retry attempt ${attempt}/${max} failed (rc=${rc}); sleeping $((attempt * 20))s"
+            sleep $((attempt * 20))
+            attempt=$((attempt + 1))
+            continue
+        fi
+        patch_aapt2 || true
+        return "$rc"
+    done
 }
 
 gmd_setup() {
