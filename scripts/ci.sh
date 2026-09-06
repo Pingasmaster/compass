@@ -68,11 +68,45 @@ patch_aapt2() {
     done < <(find "$GRADLE_USER_HOME" -type f -name aapt2 2>/dev/null)
     echo "CI: aapt2 wrap candidates=$n under $GRADLE_USER_HOME"
 }
-patch_aapt2 || true
+
+fetch_url() {
+    local url="$1" out="$2"
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL -o "$out" "$url"
+    elif command -v wget >/dev/null 2>&1; then
+        wget -q -O "$out" "$url"
+    else
+        python3 -c "import urllib.request; urllib.request.urlretrieve('$url', '$out')"
+    fi
+}
+
+# Failed CI guests do not persist .gradle, so wrap-after-crash never sticks.
+# Seed a wrapped aapt2 before the first resource compile and point AGP at it.
+seed_aapt2() {
+    local dest="/work/aapt2"
+    local jar="" ver agp
+    mkdir -p "$dest"
+    jar="$(find "$GRADLE_USER_HOME/caches" -name 'aapt2-*-linux.jar' 2>/dev/null | sort | tail -1 || true)"
+    if [ -z "$jar" ] || [ ! -f "$jar" ]; then
+        agp="$(sed -n 's/^agp = "\(.*\)"/\1/p' "$ROOT_DIR/gradle/libs.versions.toml" | head -1)"
+        ver="${agp}-15978811"
+        echo "CI: downloading aapt2 $ver"
+        fetch_url \
+            "https://dl.google.com/android/maven2/com/android/tools/build/aapt2/${ver}/aapt2-${ver}-linux.jar" \
+            "$dest/aapt2-linux.jar"
+        jar="$dest/aapt2-linux.jar"
+    fi
+    unzip -o -q -d "$dest" "$jar" aapt2
+    chmod +x "$dest/aapt2"
+    wrap_aapt2_bin "$dest/aapt2"
+    printf 'android.aapt2FromMavenOverride=%s\n' "$dest/aapt2" >> "$ROOT_DIR/gradle.properties"
+    echo "CI: seeded aapt2 override $dest/aapt2 from $jar"
+}
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT_DIR"
+seed_aapt2
 
 # Shared free-tag / handoff helpers (used when EFREIHUB_TOKEN is set).
 # shellcheck source=scripts/release_version.sh
