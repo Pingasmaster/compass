@@ -40,7 +40,6 @@ if [ ! -e "$GNU_ROOT/libc.so.6" ] || [ ! -e "$GNU_ROOT/libgcc_s.so.1" ]; then
     exit 1
 fi
 
-export LD_LIBRARY_PATH="${GNU_ROOT}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 echo "CI: GNU aapt2 loader $GNU_LD lib=$GNU_ROOT"
 
 wrap_aapt2() {

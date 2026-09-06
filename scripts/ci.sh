@@ -29,10 +29,10 @@ mkdir -p "$HOME" "$GRADLE_USER_HOME" "$TMPDIR"
 # Robolectric opens a temp dir per test class; guest default nofile is too low.
 ulimit -n 1048576 2>/dev/null || ulimit -n 65536 2>/dev/null || true
 echo "CI: nofile=$(ulimit -n) TMPDIR=$TMPDIR"
-if [ -d /opt/gnu ]; then
-  export LD_LIBRARY_PATH="/opt/gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-  echo "CI: exported LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
-elif [ -d /usr/glibc-compat/lib ]; then
+# Do not put /opt/gnu on the process LD_LIBRARY_PATH: musl Temurin would
+# load Debian libc and SIGSEGV. aapt2 is exec'd through GNU ld.so instead
+# (scripts/firecracker_aapt2.sh).
+if [ -d /usr/glibc-compat/lib ]; then
   export LD_LIBRARY_PATH="/usr/glibc-compat/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
   echo "CI: exported LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
 fi
