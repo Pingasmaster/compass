@@ -50,8 +50,8 @@ wrap_aapt2_bin() {
     mv "$bin" "$real"
     cat > "$bin" <<'WRAP'
 #!/bin/sh
-if [ -d /usr/glibc-compat/lib ]; then
-  LD_LIBRARY_PATH="/usr/glibc-compat/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+if [ -d /work/gnu ]; then
+  LD_LIBRARY_PATH="/work/gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
   export LD_LIBRARY_PATH
 fi
 exec "$(dirname "$0")/$(basename "$0").glibc" "$@"
@@ -98,9 +98,49 @@ seed_aapt2() {
     fi
     unzip -o -q -d "$dest" "$jar" aapt2
     chmod +x "$dest/aapt2"
+    seed_gnu_libs
+    python3 "$ROOT_DIR/scripts/patch_elf_interp.py" "$dest/aapt2" /work/gnu/ld.so
     wrap_aapt2_bin "$dest/aapt2"
     printf 'android.aapt2FromMavenOverride=%s\n' "$dest/aapt2" >> "$ROOT_DIR/gradle.properties"
-    echo "CI: seeded aapt2 override $dest/aapt2 from $jar"
+    echo "CI: seeded aapt2 override $dest/aapt2 from $jar (GNU ld.so)"
+}
+
+extract_deb() {
+    local deb="$1" dest="$2" tmp
+    tmp="$(mktemp -d)"
+    (cd "$tmp" && ar x "$deb" && tar -xf data.tar.*)
+    mkdir -p "$dest"
+    cp -a "$tmp"/lib/x86_64-linux-gnu/. "$dest"/ 2>/dev/null || true
+    cp -a "$tmp"/lib64/. "$dest"/ 2>/dev/null || true
+    cp -a "$tmp"/usr/lib/x86_64-linux-gnu/. "$dest"/ 2>/dev/null || true
+    rm -rf "$tmp"
+}
+
+seed_gnu_libs() {
+    local dir="/work/gnu" tmp
+    mkdir -p "$dir"
+    if [ -x "$dir/ld.so" ] && [ -e "$dir/libc.so.6" ] && [ -e "$dir/libgcc_s.so.1" ]; then
+        echo "CI: reusing $dir"
+        return 0
+    fi
+    tmp="$(mktemp -d)"
+    echo "CI: downloading Debian glibc/libgcc for aapt2"
+    fetch_url \
+        "https://ftp.debian.org/debian/pool/main/g/glibc/libc6_2.36-9+deb12u10_amd64.deb" \
+        "$tmp/libc6.deb"
+    fetch_url \
+        "https://ftp.debian.org/debian/pool/main/g/gcc-12/libgcc-s1_12.2.0-14_amd64.deb" \
+        "$tmp/libgcc.deb"
+    extract_deb "$tmp/libc6.deb" "$dir"
+    extract_deb "$tmp/libgcc.deb" "$dir"
+    # Short INTERP path so it fits the existing PT_INTERP slot.
+    if [ -f "$dir/ld-linux-x86-64.so.2" ]; then
+        cp -a "$dir/ld-linux-x86-64.so.2" "$dir/ld.so"
+    elif [ -f /work/gnu/ld-linux-x86-64.so.2 ]; then
+        cp -a /work/gnu/ld-linux-x86-64.so.2 "$dir/ld.so"
+    fi
+    rm -rf "$tmp"
+    ls -l "$dir/ld.so" "$dir/libc.so.6" "$dir/libgcc_s.so.1"
 }
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
