@@ -7,7 +7,7 @@ plugins {
  * Self-instrumenting so R8 keeps are not loosened by androidTest keep rules.
  */
 android {
-    namespace = "com.compass.app.shippedsmoke"
+    namespace = "app.efrei.compass.shippedsmoke"
     compileSdk = 37
     buildToolsVersion = "37.0.0"
 

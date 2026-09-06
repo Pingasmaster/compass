@@ -203,7 +203,7 @@ project_run_extra_standalone() { return 0; }
 # =============================================================================
 
 REQUIRE_RELEASE_SIGNING_FLAG=(-Pcompass.requireReleaseSigning=true)
-SMOKE_ANNOTATION="com.compass.app.testing.SmokeTest"
+SMOKE_ANNOTATION="app.efrei.compass.testing.SmokeTest"
 E2E_NOT_ANNOTATION=""
 HAS_COMPAT_SMOKE=0
 HAS_ASR_FIXTURE=0

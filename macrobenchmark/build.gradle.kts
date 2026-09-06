@@ -9,7 +9,7 @@ plugins {
 }
 
 android {
-    namespace = "com.compass.app.macrobenchmark"
+    namespace = "app.efrei.compass.macrobenchmark"
     compileSdk = 37
     buildToolsVersion = "37.0.0"
 

@@ -8,7 +8,7 @@ plugins {
 }
 
 android {
-    namespace = "com.compass.app"
+    namespace = "app.efrei.compass"
     compileSdk = 37
     buildToolsVersion = "37.0.0"
     // Compile against the 37.1 minor SDK release (API additions only; minor

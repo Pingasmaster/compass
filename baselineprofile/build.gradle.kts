@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace = "com.compass.app.baselineprofile"
+    namespace = "app.efrei.compass.baselineprofile"
     compileSdk = 37
     buildToolsVersion = "37.0.0"
 

@@ -91,7 +91,7 @@ export ANDROID_USER_HOME="${ANDROID_USER_HOME:-$HOME/.android}"
 mkdir -p "$ANDROID_USER_HOME"
 export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:+$JAVA_TOOL_OPTIONS }--sun-misc-unsafe-memory-access=allow --enable-native-access=ALL-UNNAMED -Duser.home=${HOME}"
 
-SMOKE_ANNOTATION="com.compass.app.testing.SmokeTest"
+SMOKE_ANNOTATION="app.efrei.compass.testing.SmokeTest"
 SMOKE_ASSERT_COUNT=1
 E2E_ASSERT_COUNT=1
 SHIPPED_SMOKE_ASSERT_COUNT=1
