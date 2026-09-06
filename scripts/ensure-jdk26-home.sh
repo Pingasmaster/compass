@@ -96,7 +96,10 @@ filter_jep498_unsafe_warnings() {
 # AGP aapt2 is a glibc binary. Gradle worker JVMs exec this wrapper by
 # absolute path and do not inherit the CI shell's LD_LIBRARY_PATH, so
 # Alpine musl libgcc_s would make aapt2 segfault at daemon startup.
-if [ -d /usr/glibc-compat/lib ]; then
+# Prefer the baked GNU prefix (/opt/gnu) over empty gcompat leftovers.
+if [ -d /opt/gnu ]; then
+  export LD_LIBRARY_PATH="/opt/gnu\${LD_LIBRARY_PATH:+:\$LD_LIBRARY_PATH}"
+elif [ -d /usr/glibc-compat/lib ]; then
   export LD_LIBRARY_PATH="/usr/glibc-compat/lib\${LD_LIBRARY_PATH:+:\$LD_LIBRARY_PATH}"
 fi
 

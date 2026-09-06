@@ -614,12 +614,12 @@ SPLco;->a(Lco;Lxi;Ljava/lang/Throwable;I)Lco;
 Lco1;
 SPLco1;-><init>(Lfb0;)V
 SPLco1;->getValue()Ljava/lang/Object;
-Lcom/compass/app/CompassApplication;
-SPLcom/compass/app/CompassApplication;-><init>()V
-SPLcom/compass/app/CompassApplication;->onCreate()V
-Lcom/compass/app/MainActivity;
-SPLcom/compass/app/MainActivity;-><init>()V
-SPLcom/compass/app/MainActivity;->onCreate(Landroid/os/Bundle;)V
+Lapp/efrei/compass/CompassApplication;
+SPLapp/efrei/compass/CompassApplication;-><init>()V
+SPLapp/efrei/compass/CompassApplication;->onCreate()V
+Lapp/efrei/compass/MainActivity;
+SPLapp/efrei/compass/MainActivity;-><init>()V
+SPLapp/efrei/compass/MainActivity;->onCreate(Landroid/os/Bundle;)V
 Lcp;
 SPLcp;-><init>(B)V
 SPLcp;->p(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
@@ -4045,7 +4045,7 @@ SPLpv1;-><init>(IILm20;)V
 SPLpv1;->f()Lcy0;
 Lpw;
 SPLpw;-><clinit>()V
-SPLpw;->a(Lcom/compass/app/CompassApplication;)Lsq0;
+SPLpw;->a(Lapp/efrei/compass/CompassApplication;)Lsq0;
 Lpx1;
 Lpy;
 SPLpy;-><init>(Lfb0;Lrk1;)V
@@ -5483,7 +5483,7 @@ SPLvm1;-><init>(FFIII)V
 SPLvm1;->equals(Ljava/lang/Object;)Z
 Lvn;
 SPLvn;-><init>(Ljava/lang/Object;Lzr;B)V
-SPLvn;-><init>(ZLcom/compass/app/MainActivity;Lzr;)V
+SPLvn;-><init>(ZLapp/efrei/compass/MainActivity;Lzr;)V
 SPLvn;->q(Lzr;Ljava/lang/Object;)Lzr;
 SPLvn;->s(Ljava/lang/Object;)Ljava/lang/Object;
 Lvo;

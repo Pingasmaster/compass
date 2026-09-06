@@ -29,144 +29,17 @@ mkdir -p "$HOME" "$GRADLE_USER_HOME" "$TMPDIR"
 # Robolectric opens a temp dir per test class; guest default nofile is too low.
 ulimit -n 1048576 2>/dev/null || ulimit -n 65536 2>/dev/null || true
 echo "CI: nofile=$(ulimit -n) TMPDIR=$TMPDIR"
-# AGP aapt2 (Gradle cache, glibc) segfaults on musl libgcc_s. GNU libgcc_s
-# lives in the guest glibc prefix.
-if [ -d /usr/glibc-compat/lib ]; then
+if [ -d /opt/gnu ]; then
+  export LD_LIBRARY_PATH="/opt/gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+  echo "CI: exported LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
+elif [ -d /usr/glibc-compat/lib ]; then
   export LD_LIBRARY_PATH="/usr/glibc-compat/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
   echo "CI: exported LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
 fi
 
-# AGP launches aapt2 as a native daemon from Gradle workers. Those JVMs
-# often miss the CI shell LD_LIBRARY_PATH, so wrap every cached aapt2
-# ELF with a shim that exports GNU libgcc_s before exec.
-wrap_aapt2_bin() {
-    local bin="$1"
-    local real="${bin}.glibc"
-    [ -f "$bin" ] || return 0
-    [ -f "$real" ] && return 0
-    local magic
-    magic="$(head -c 4 "$bin" || true)"
-    [ "$magic" = $'\177ELF' ] || return 0
-    mv "$bin" "$real"
-    cat > "$bin" <<'WRAP'
-#!/bin/sh
-if [ -d /work/gnu ]; then
-  LD_LIBRARY_PATH="/work/gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-  export LD_LIBRARY_PATH
-fi
-exec "$(dirname "$0")/$(basename "$0").glibc" "$@"
-WRAP
-    chmod +x "$bin" "$real"
-}
-
-patch_aapt2() {
-    local n=0 bin
-    [ -d "$GRADLE_USER_HOME" ] || return 0
-    while IFS= read -r bin; do
-        wrap_aapt2_bin "$bin"
-        n=$((n + 1))
-    done < <(find "$GRADLE_USER_HOME" -type f -name aapt2 2>/dev/null)
-    echo "CI: aapt2 wrap candidates=$n under $GRADLE_USER_HOME"
-}
-
-fetch_url() {
-    local url="$1" out="$2" attempt=1 max=4 rc=0
-    while [ "$attempt" -le "$max" ]; do
-        set +e
-        if command -v curl >/dev/null 2>&1; then
-            curl -fsSL --retry 2 --retry-delay 2 -o "$out" "$url"
-            rc=$?
-        elif command -v wget >/dev/null 2>&1; then
-            wget -q -O "$out" "$url"
-            rc=$?
-        else
-            python3 -c "import urllib.request; urllib.request.urlretrieve('$url', '$out')"
-            rc=$?
-        fi
-        set -e
-        if [ "$rc" -eq 0 ] && [ -s "$out" ]; then
-            return 0
-        fi
-        echo "CI: fetch attempt ${attempt}/${max} failed rc=${rc} url=$url"
-        sleep $((attempt * 15))
-        attempt=$((attempt + 1))
-    done
-    return 1
-}
-
-# Failed CI guests do not persist .gradle, so wrap-after-crash never sticks.
-# Seed a wrapped aapt2 before the first resource compile and point AGP at it.
-seed_aapt2() {
-    local dest="/work/aapt2"
-    local jar="" ver agp sdk_aapt2
-    mkdir -p "$dest"
-    sdk_aapt2="$(find /opt/android-sdk /work/android-sdk -type f -name aapt2 2>/dev/null | head -1 || true)"
-    if [ -n "$sdk_aapt2" ] && [ -f "$sdk_aapt2" ]; then
-        echo "CI: using SDK aapt2 $sdk_aapt2"
-        cp -a "$sdk_aapt2" "$dest/aapt2"
-    else
-        jar="$(find "$GRADLE_USER_HOME/caches" -name 'aapt2-*-linux.jar' 2>/dev/null | sort | tail -1 || true)"
-        if [ -z "$jar" ] || [ ! -f "$jar" ]; then
-            agp="$(sed -n 's/^agp = "\(.*\)"/\1/p' "$ROOT_DIR/gradle/libs.versions.toml" | head -1)"
-            ver="${agp}-15978811"
-            echo "CI: downloading aapt2 $ver"
-            fetch_url \
-                "https://dl.google.com/android/maven2/com/android/tools/build/aapt2/${ver}/aapt2-${ver}-linux.jar" \
-                "$dest/aapt2-linux.jar"
-            jar="$dest/aapt2-linux.jar"
-        fi
-        unzip -o -q -d "$dest" "$jar" aapt2
-    fi
-    chmod +x "$dest/aapt2"
-    seed_gnu_libs
-    python3 "$ROOT_DIR/scripts/patch_elf_interp.py" "$dest/aapt2" /work/gnu/ld.so
-    wrap_aapt2_bin "$dest/aapt2"
-    printf 'android.aapt2FromMavenOverride=%s\n' "$dest/aapt2" >> "$ROOT_DIR/gradle.properties"
-    echo "CI: seeded aapt2 override $dest/aapt2 from $jar (GNU ld.so)"
-}
-
-extract_deb() {
-    local deb="$1" dest="$2" tmp
-    tmp="$(mktemp -d)"
-    (cd "$tmp" && ar x "$deb" && tar -xf data.tar.*)
-    mkdir -p "$dest"
-    cp -a "$tmp"/lib/x86_64-linux-gnu/. "$dest"/ 2>/dev/null || true
-    cp -a "$tmp"/lib64/. "$dest"/ 2>/dev/null || true
-    cp -a "$tmp"/usr/lib/x86_64-linux-gnu/. "$dest"/ 2>/dev/null || true
-    rm -rf "$tmp"
-}
-
-seed_gnu_libs() {
-    local dir="/work/gnu" tmp
-    mkdir -p "$dir"
-    if [ -x "$dir/ld.so" ] && [ -e "$dir/libc.so.6" ] && [ -e "$dir/libgcc_s.so.1" ]; then
-        echo "CI: reusing $dir"
-        return 0
-    fi
-    tmp="$(mktemp -d)"
-    echo "CI: downloading Debian glibc/libgcc for aapt2"
-    fetch_url \
-        "https://ftp.debian.org/debian/pool/main/g/glibc/libc6_2.36-9+deb12u10_amd64.deb" \
-        "$tmp/libc6.deb"
-    fetch_url \
-        "https://ftp.debian.org/debian/pool/main/g/gcc-12/libgcc-s1_12.2.0-14_amd64.deb" \
-        "$tmp/libgcc.deb"
-    extract_deb "$tmp/libc6.deb" "$dir"
-    extract_deb "$tmp/libgcc.deb" "$dir"
-    # Short INTERP path so it fits the existing PT_INTERP slot.
-    if [ -f "$dir/ld-linux-x86-64.so.2" ]; then
-        cp -a "$dir/ld-linux-x86-64.so.2" "$dir/ld.so"
-    elif [ -f /work/gnu/ld-linux-x86-64.so.2 ]; then
-        cp -a /work/gnu/ld-linux-x86-64.so.2 "$dir/ld.so"
-    fi
-    rm -rf "$tmp"
-    ls -l "$dir/ld.so" "$dir/libc.so.6" "$dir/libgcc_s.so.1"
-}
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$ROOT_DIR"
-seed_aapt2
 
 # Shared free-tag / handoff helpers (used when EFREIHUB_TOKEN is set).
 # shellcheck source=scripts/release_version.sh
@@ -227,6 +100,9 @@ export ANDROID_USER_HOME="${ANDROID_USER_HOME:-$HOME/.android}"
 mkdir -p "$ANDROID_USER_HOME"
 export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:+$JAVA_TOOL_OPTIONS }--sun-misc-unsafe-memory-access=allow --enable-native-access=ALL-UNNAMED -Duser.home=${HOME}"
 
+# shellcheck source=scripts/firecracker_aapt2.sh
+source "$ROOT_DIR/scripts/firecracker_aapt2.sh"
+
 SMOKE_ANNOTATION="app.efrei.compass.testing.SmokeTest"
 SMOKE_ASSERT_COUNT=1
 E2E_ASSERT_COUNT=1
@@ -266,7 +142,6 @@ GMD_GPU=(-Pandroid.testoptions.manageddevices.emulator.gpu=swiftshader_indirect)
 
 GRADLE_CMD=(./scripts/run_gradle.sh)
 gradle() {
-    patch_aapt2 || true
     local attempt=1 max=4 rc
     while true; do
         set +e
@@ -274,7 +149,6 @@ gradle() {
         rc=$?
         set -e
         if [ "$rc" -eq 0 ]; then
-            patch_aapt2 || true
             return 0
         fi
         if [ "$attempt" -lt "$max" ]; then
@@ -283,7 +157,6 @@ gradle() {
             attempt=$((attempt + 1))
             continue
         fi
-        patch_aapt2 || true
         return "$rc"
     done
 }
@@ -362,6 +235,7 @@ run_shipped_smoke_tests() {
 }
 
 chmod +x ./scripts/check_ascii.sh
+chmod +x ./scripts/check_application_id.sh
 chmod +x ./scripts/check_release_signing_gate.sh
 chmod +x ./scripts/check_elf_16k_alignment.sh
 chmod +x ./scripts/gmd_ensure_avd.sh
@@ -369,6 +243,7 @@ chmod +x ./scripts/assert_tests_ran.sh
 chmod +x ./scripts/run_gradle.sh
 
 ./scripts/check_ascii.sh
+./scripts/check_application_id.sh
 ./scripts/check_release_signing_gate.sh
 
 echo "Running debug lints and tests..."

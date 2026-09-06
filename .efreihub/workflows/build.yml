@@ -7,7 +7,7 @@
 # debug-signed release fallback), ELF check, and (when /dev/kvm is in
 # the jail) shippedsmoke + smoke + hermetic e2e. ci.sh also runs
 # scripts/check_ascii.sh and scripts/check_release_signing_gate.sh
-# itself, so this workflow does not repeat those two checks as a
+# itself, so this workflow does not repeat those checks as a
 # separate step.
 #
 # After a green ci.sh the same guest runs ./scripts/publish_ci_release.sh:

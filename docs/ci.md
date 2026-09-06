@@ -34,28 +34,29 @@ HTTP serve).
 `ci.sh` runs:
 
 1. `scripts/check_ascii.sh`
-2. `scripts/check_release_signing_gate.sh`
-3. Debug lints + unit tests (`ktlintCheck`, `detekt`,
+2. `scripts/check_application_id.sh` (only `app.efrei.compass`; no previous id)
+3. `scripts/check_release_signing_gate.sh`
+4. Debug lints + unit tests (`ktlintCheck`, `detekt`,
    `lintCompatDebug`, `lintFutureDebug`, `testCompatDebugUnitTest`,
    `testFutureDebugUnitTest`)
-4. `scripts/assert_tests_ran.sh 1 app unit` - counts `<testcase>`
+5. `scripts/assert_tests_ran.sh 1 app unit` - counts `<testcase>`
    elements in JVM unit-test JUnit XML and fails if zero tests ran
-5. Debug APKs (`assembleCompatDebug`, `assembleFutureDebug`)
-6. Release lint + assemble WITH `-Pcompass.requireReleaseSigning=true`
+6. Debug APKs (`assembleCompatDebug`, `assembleFutureDebug`)
+7. Release lint + assemble WITH `-Pcompass.requireReleaseSigning=true`
    (`lintCompatRelease`, `lintFutureRelease`,
    `:macrobenchmark:assembleFutureRelease`,
    `:shippedsmoke:assembleFutureRelease`, `assembleCompatRelease`,
    `assembleFutureRelease`) - no debug-signed release fallback from
    CI; this step requires the two release-signing file secrets to be
    present at the repo root (see "Secrets" below)
-7. `scripts/check_elf_16k_alignment.sh`
-8. When `/dev/kvm` exists: shippedsmoke + smoke + hermetic e2e on one
+8. `scripts/check_elf_16k_alignment.sh`
+9. When `/dev/kvm` exists: shippedsmoke + smoke + hermetic e2e on one
    API 37 GMD, each followed by `scripts/assert_tests_ran.sh`
 
 The workflow file does not repeat `check_ascii.sh` /
-`check_release_signing_gate.sh` as a separate step: `ci.sh` already
-runs both, so a duplicate step would just be two names for the same
-check drifting out of sync.
+`check_application_id.sh` / `check_release_signing_gate.sh` as a
+separate step: `ci.sh` already runs them, so a duplicate step would
+just be two names for the same check drifting out of sync.
 
 ## Publish
 

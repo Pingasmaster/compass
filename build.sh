@@ -569,6 +569,8 @@ project_run_extra_standalone
 acquire_lock
 
 ./scripts/check_ascii.sh
+chmod +x ./scripts/check_application_id.sh
+./scripts/check_application_id.sh
 chmod +x ./scripts/check_release_signing_gate.sh
 ./scripts/check_release_signing_gate.sh
 chmod +x ./scripts/check_elf_16k_alignment.sh
