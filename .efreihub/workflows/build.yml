@@ -64,8 +64,6 @@ jobs:
         - gcompat
         - libstdc++
         - which
-        - python3
-        - binutils
       jdk: "27"
       android-sdk: true
       cpus: all
