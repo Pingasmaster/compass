@@ -24,7 +24,11 @@ set -euo pipefail
 # Firecracker rootfs is read-only. Keep Gradle/JDK state on the work disk.
 export HOME=/work/.efreihub-home
 export GRADLE_USER_HOME="${GRADLE_USER_HOME:-/work/.gradle}"
-mkdir -p "$HOME" "$GRADLE_USER_HOME"
+export TMPDIR="${TMPDIR:-/work/tmp}"
+mkdir -p "$HOME" "$GRADLE_USER_HOME" "$TMPDIR"
+# Robolectric opens a temp dir per test class; guest default nofile is too low.
+ulimit -n 1048576 2>/dev/null || ulimit -n 65536 2>/dev/null || true
+echo "CI: nofile=$(ulimit -n) TMPDIR=$TMPDIR"
 # AGP aapt2 (Gradle cache, glibc) segfaults on musl libgcc_s. GNU libgcc_s
 # lives in the guest glibc prefix.
 if [ -d /usr/glibc-compat/lib ]; then
