@@ -44,9 +44,14 @@ echo "CI: GNU aapt2 loader $GNU_LD lib=$GNU_ROOT"
 
 wrap_glibc_bin() {
     local bin="$1"
+    local extra_lib="${2:-}"
     local real="${bin}.real"
-    local hdr
+    local hdr libs
     [ -n "$bin" ] && [ -f "$bin" ] || return 0
+    libs="${GNU_ROOT}"
+    if [ -n "$extra_lib" ] && [ -d "$extra_lib" ]; then
+        libs="${GNU_ROOT}:${extra_lib}"
+    fi
     if [ -f "$real" ]; then
         if grep -q 'ld-linux-x86-64.so.2' "$bin" 2>/dev/null; then
             return 0
@@ -59,10 +64,10 @@ wrap_glibc_bin() {
     fi
     cat >"$bin" <<WRAP
 #!/bin/sh
-exec ${GNU_LD} --library-path "${GNU_ROOT}" ${real} "\$@"
+exec ${GNU_LD} --library-path "${libs}" ${real} "\$@"
 WRAP
     chmod +x "$bin" "$real"
-    echo "CI: wrapped $(basename "$bin") $bin via $GNU_LD"
+    echo "CI: wrapped $(basename "$bin") $bin via $GNU_LD lib=$libs"
 }
 
 DEST=/work/aapt2
@@ -87,16 +92,17 @@ if [ -z "$SDK_AAPT2" ] || [ ! -f "$SDK_AAPT2" ]; then
     exit 1
 fi
 
+SDK_DIR="$(dirname "$SDK_AAPT2")"
+SDK_LIB64="${SDK_DIR}/lib64"
 echo "CI: using SDK aapt2 $SDK_AAPT2"
 cp -a "$SDK_AAPT2" "$DEST/aapt2"
 chmod +x "$DEST/aapt2"
-wrap_glibc_bin "$DEST/aapt2"
+wrap_glibc_bin "$DEST/aapt2" "$SDK_LIB64"
 
-SDK_DIR="$(dirname "$SDK_AAPT2")"
 if [ -f "$SDK_DIR/zipalign" ]; then
     cp -a "$SDK_DIR/zipalign" "$DEST/zipalign"
     chmod +x "$DEST/zipalign"
-    wrap_glibc_bin "$DEST/zipalign"
+    wrap_glibc_bin "$DEST/zipalign" "$SDK_LIB64"
     export ZIPALIGN="$DEST/zipalign"
     echo "CI: ZIPALIGN=$ZIPALIGN"
 fi
@@ -123,4 +129,4 @@ fi
 echo "CI: aapt2 version: $("$AAPT2_OVERRIDE" version 2>/dev/null | head -1)"
 
 unset -f wrap_glibc_bin
-unset GNU_ROOT GNU_LD DEST SDK_AAPT2 SDK_DIR AAPT2_OVERRIDE cand bin
+unset GNU_ROOT GNU_LD DEST SDK_AAPT2 SDK_DIR SDK_LIB64 AAPT2_OVERRIDE cand bin

@@ -95,7 +95,11 @@ run_zipalign() {
     local hdr
     hdr="$(head -c 4 "$bin" 2>/dev/null || true)"
     if [[ "$hdr" == $'\177ELF' && -x /opt/gnu/ld-linux-x86-64.so.2 && -e /opt/gnu/libc.so.6 ]]; then
-        /opt/gnu/ld-linux-x86-64.so.2 --library-path /opt/gnu "$bin" "$@"
+        local libs="/opt/gnu"
+        if [[ -d "$(dirname "$bin")/lib64" ]]; then
+            libs="/opt/gnu:$(dirname "$bin")/lib64"
+        fi
+        /opt/gnu/ld-linux-x86-64.so.2 --library-path "$libs" "$bin" "$@"
     else
         "$bin" "$@"
     fi
