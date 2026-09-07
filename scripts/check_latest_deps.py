@@ -50,13 +50,21 @@ PRE_RANK = {
 
 def fetch(url: str, timeout: float = 20.0) -> bytes | None:
     req = urllib.request.Request(url, headers={"User-Agent": UA})
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            if resp.status != 200:
-                return None
-            return resp.read()
-    except (urllib.error.URLError, TimeoutError, OSError):
-        return None
+    last_error: Exception | None = None
+    for attempt in range(1, 4):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                if resp.status != 200:
+                    last_error = OSError(f"http {resp.status}")
+                else:
+                    return resp.read()
+        except (urllib.error.URLError, TimeoutError, OSError) as error:
+            last_error = error
+        if attempt < 3:
+            import time
+
+            time.sleep(attempt * 2)
+    return None
 
 
 def parse_metadata(xml: bytes) -> list[str]:
@@ -259,9 +267,10 @@ def main() -> int:
         print(f"OK    gradle-wrapper={current_gradle}")
 
     if unknown:
-        print("WARN  could not resolve:", file=sys.stderr)
+        print("ERROR: could not resolve Maven metadata (fail closed):", file=sys.stderr)
         for item in sorted(unknown):
             print(f"  {item}", file=sys.stderr)
+        return 1
 
     if args.apply and (stale or gradle_stale):
         updated = raw
