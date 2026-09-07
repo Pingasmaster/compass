@@ -1,24 +1,24 @@
 [versions]
-agp = "9.5.0-alpha03"
+agp = "9.5.0-alpha04"
 desugar-jdk-libs = "2.1.5"
-kotlin-compose = "2.4.20-RC3"
+kotlin-compose = "2.4.20"
 leakcanary = "3.0-alpha-9"
 
 # The Compose BOM pins every androidx.compose.* artefact. The explicit
 # `compose` version was removed - let the BOM be the single source of truth
 # so runtime/ui/foundation/animation don't drift.
 compose-bom = "2026.08.00"
-material3 = "1.5.0-alpha26"
-material3-adaptive = "1.3.0"
+material3 = "1.5.0-alpha27"
+material3-adaptive = "1.4.0-alpha01"
 core-splashscreen = "1.2.0"
 
-activity-compose = "1.13.0"
-lifecycle = "2.12.0-alpha01"
+activity-compose = "1.14.0-alpha01"
+lifecycle = "2.12.0-alpha02"
 
 datastore = "1.3.0-alpha10"
 coroutines = "1.11.0"
 okhttp = "5.5.0"
-serialization = "1.11.0"
+serialization = "1.12.0-RC"
 core-ktx = "1.19.0"
 
 junit = "4.13.2"
@@ -31,7 +31,7 @@ turbine = "1.2.1"
 # AGP 9 (Google issue tracker b/443311090: "Module `:app` is not a supported android
 # module."). The fix landed in 1.5.0-alpha01 (Dec 2025); we ship 1.5.0-beta01
 # (latest), which retains AGP 9 compatibility without dropping 1.4.x CUJ scenarios.
-androidx-benchmark = "1.5.0-rc01"
+androidx-benchmark = "1.5.0-rc02"
 androidx-profileinstaller = "1.4.1"
 androidx-test-runner = "1.7.0"
 androidx-test-ext-junit = "1.3.0"
@@ -44,10 +44,10 @@ errorprone-annotations = "2.50.0"
 # kotlin-compiler-embeddable into the JDK 26 daemon and emit JEP 498 WARNINGs.
 ktlint-engine = "1.8.0"
 detekt = "2.0.0-alpha.6"
-compose-rules = "0.6.4"
+compose-rules = "0.6.6"
 slack-lint-checks = "0.11.1"
-slack-compose-lints = "1.5.4"
-dependency-analysis = "3.18.0"
+slack-compose-lints = "1.6.0"
+dependency-analysis = "3.19.1"
 
 # JDK toolchain target. AGP 9.x requires JDK 17+; we build and run on JDK 26.
 jvmTarget = "26"

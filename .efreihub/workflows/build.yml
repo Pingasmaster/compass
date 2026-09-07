@@ -64,6 +64,7 @@ jobs:
         - gcompat
         - libstdc++
         - which
+        - python3
       jdk: "27"
       android-sdk: true
       cpus: all
@@ -86,6 +87,13 @@ jobs:
 
       # One guest for gate + publish: avoids a second cold Firecracker boot
       # and keeps /work handoff + Gradle/SDK caches warm.
+
+      - name: latest dependencies
+        run: |
+          set -eu
+          chmod +x ./scripts/check_latest_deps.py
+          python3 ./scripts/check_latest_deps.py
+
       - name: scripts/ci.sh + publish
         run: |
           set -eu

@@ -235,6 +235,8 @@ run_shipped_smoke_tests() {
 }
 
 chmod +x ./scripts/check_ascii.sh
+chmod +x ./scripts/check_latest_deps.py
+python3 ./scripts/check_latest_deps.py
 chmod +x ./scripts/check_application_id.sh
 chmod +x ./scripts/check_release_signing_gate.sh
 chmod +x ./scripts/check_elf_16k_alignment.sh
